@@ -2,10 +2,8 @@
   <AppShell :title="doc?.title || '文档编辑'">
     <template #actions>
       <span class="pill">{{ saveStatusText }}</span>
-      <span v-if="auth.user" class="editor-owner" :style="{ background: auth.user.color || '#93c5fd' }">
-        {{ auth.user.display_name || auth.user.username }}
-      </span>
       <el-button @click="$router.push('/documents')">返回列表</el-button>
+      <el-button type="danger" @click="deleteDoc">删除</el-button>
       <el-button @click="shareDoc">分享</el-button>
     </template>
 
@@ -250,6 +248,16 @@ async function genShare() {
 function copyLink() {
   navigator.clipboard.writeText(shareLink.value)
   ElMessage.success('已复制')
+}
+
+async function deleteDoc() {
+  try {
+    await api.delete(`/documents/${doc.value.id}`)
+    ElMessage.success('文档已删除')
+    router.push('/documents')
+  } catch {
+    ElMessage.error('删除失败')
+  }
 }
 </script>
 
