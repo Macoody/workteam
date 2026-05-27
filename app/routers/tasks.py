@@ -261,6 +261,9 @@ def claim_task(task_id: int, db: Session = Depends(get_db), current_user: User =
     target_column = resolve_target_column(db, task.project_id, "进行中")
     if not target_column:
         raise HTTPException(status_code=400, detail="项目中缺少“进行中”列")
+    pending_column = resolve_target_column(db, task.project_id, "待处理")
+    if not pending_column or task.column_id != pending_column.id:
+        raise HTTPException(status_code=400, detail="只有待处理状态的任务才能领取")
 
     task.assignee_id = current_user.id
     task.column_id = target_column.id

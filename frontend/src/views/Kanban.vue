@@ -99,7 +99,7 @@
         <div class="drawer-actions">
           <el-button type="primary" :loading="saving" @click="saveTask">保存</el-button>
           <el-button :disabled="deliveryTimeline.length >= 5" @click="showExtensionPicker = true">延期</el-button>
-          <el-button type="warning" :loading="claiming" @click="claimTask">领取任务</el-button>
+          <el-button v-if="canClaimTask" type="warning" :loading="claiming" @click="claimTask">领取任务</el-button>
           <el-button type="success" :loading="completing" @click="completeTask">完成任务</el-button>
           <el-button type="danger" @click="deleteTask">删除</el-button>
         </div>
@@ -202,6 +202,7 @@ const creating = ref(false)
 
 const deliveryTimeline = computed(() => currentTask.value?.delivery_dates || [])
 const currentProject = computed(() => projects.value.find(item => item.id === selectedProject.value) || null)
+const canClaimTask = computed(() => currentTask.value && currentTask.value.column_id === getPendingColumnId())
 
 onMounted(async () => {
   await auth.getMe()
@@ -390,6 +391,11 @@ async function claimTask() {
 
 function resolveUser(userId) {
   return users.value.find(item => item.id === userId) || null
+}
+
+function getPendingColumnId() {
+  const pendingColumn = columns.value.find(item => item.name === '待处理')
+  return pendingColumn?.id || null
 }
 
 function latestDeliveryDate(task) {
