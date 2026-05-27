@@ -21,7 +21,7 @@
             <span>项目管理</span>
           </el-menu-item>
           <el-menu-item index="/kanban">
-            <el-icon><Board /></el-icon>
+            <el-icon><SGrid /></el-icon>
             <span>看板</span>
           </el-menu-item>
           <el-menu-item index="/tasks">
@@ -44,7 +44,7 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { Odometer, Folder, Board, List, Document } from '@element-plus/icons-vue'
+import { Odometer, Folder, SGrid, List, Document } from '@element-plus/icons-vue'
 
 const auth = useAuthStore()
 onMounted(() => auth.getMe())
