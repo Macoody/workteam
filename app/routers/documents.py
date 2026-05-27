@@ -85,7 +85,7 @@ def delete_document(doc_id: int, db: Session = Depends(get_db), current_user: Us
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在")
-    if doc.creator_id != current_user.id and current_user.role != UserRole.ADMIN:
+    if doc.creator_id != current_user.id and current_user.role.value != "admin":
         raise HTTPException(status_code=403, detail="无删除权限")
     db.delete(doc)
     db.commit()

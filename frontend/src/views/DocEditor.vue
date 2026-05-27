@@ -3,7 +3,7 @@
     <template #actions>
       <span class="pill">{{ saveStatusText }}</span>
       <el-button @click="$router.push('/documents')">返回列表</el-button>
-      <el-button type="danger" @click="deleteDoc">删除</el-button>
+      <el-button v-if="doc?.creator_id === auth.user?.id || auth.user?.role === 'admin'" type="danger" @click="deleteDoc">删除</el-button>
       <el-button @click="shareDoc">分享</el-button>
     </template>
 
