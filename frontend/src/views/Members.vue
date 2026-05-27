@@ -38,6 +38,13 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
+        <el-table-column label="最后使用" width="180">
+          <template #default="{ row }">
+            <span :class="row.last_active_time ? '' : 'text-muted'">
+              {{ formatDate(row.last_active_time) }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="170" fixed="right">
           <template #default="{ row }">
             <div style="display: flex; gap: 8px">
@@ -272,5 +279,10 @@ function formatDate(value) {
 
 .color-swatch.active {
   border-color: #0f172a;
+}
+
+.text-muted {
+  color: #999;
+  font-size: 12px;
 }
 </style>
