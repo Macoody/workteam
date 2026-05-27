@@ -14,11 +14,23 @@ from datetime import datetime, timedelta
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.models import User, UserRole
-from app.schemas.schemas import UserCreate, UserResponse, TokenResponse
+from app.schemas.schemas import UserCreate, UserManageCreate, UserManageUpdate, UserResponse, TokenResponse
 
 router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+
+def _clean_optional(value: str | None):
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
+
+def _clean_color(value: str | None):
+    value = (value or "").strip()
+    return value or "#93c5fd"
 
 
 def _pbkdf2_hash(password: str, salt: bytes, rounds: int = 600000) -> str:
@@ -109,7 +121,6 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
         username=data.username,
         password_hash=get_password_hash(data.password),
         display_name=data.display_name or data.username,
-        email=data.email,
         phone=data.phone,
         role=UserRole.MEMBER,
     )
@@ -158,7 +169,83 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 @router.get("/users", response_model=list[UserResponse])
 def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return db.query(User).filter(User.is_active == True).all()
+    return db.query(User).filter(User.is_active == True).order_by(User.created_at.desc()).all()
+
+
+@router.post("/users", response_model=UserResponse)
+def create_user(data: UserManageCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    phone = _clean_optional(data.phone)
+    color = _clean_color(data.color)
+
+    if db.query(User).filter(User.username == data.username).first():
+        raise HTTPException(status_code=400, detail="用户名已存在")
+    if phone and db.query(User).filter(User.phone == phone).first():
+        raise HTTPException(status_code=400, detail="手机号已存在")
+
+    try:
+        role = UserRole(data.role)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="无效的角色")
+
+    user = User(
+        username=data.username,
+        password_hash=get_password_hash(data.password),
+        display_name=data.display_name or data.username,
+        phone=phone,
+        role=role,
+        color=color,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.put("/users/{user_id}", response_model=UserResponse)
+def update_user(user_id: int, data: UserManageUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    phone = _clean_optional(data.phone)
+    color = _clean_color(data.color) if data.color is not None else None
+
+    if phone:
+        exists_phone = db.query(User).filter(User.phone == phone, User.id != user_id).first()
+        if exists_phone:
+            raise HTTPException(status_code=400, detail="手机号已存在")
+
+    if data.role is not None:
+        try:
+            user.role = UserRole(data.role)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="无效的角色")
+
+    if data.display_name is not None:
+        user.display_name = data.display_name
+    if data.phone is not None:
+        user.phone = phone
+    if data.password:
+        user.password_hash = get_password_hash(data.password)
+    if data.color is not None:
+        user.color = color
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="不能删除当前登录账号")
+
+    user.is_active = False
+    db.commit()
+    return {"ok": True}
 
 
 @router.put("/users/{user_id}/role")

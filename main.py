@@ -1,5 +1,5 @@
 """
-工作团队系统 - FastAPI 后端
+徐东摆地摊 - FastAPI 后端
 Phase 1 MVP: 用户注册登录 + 项目管理 + 看板 + 任务增删改查 + 文档中心
 """
 import os
@@ -9,13 +9,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.core.config import settings
-from app.core.database import engine, Base, get_db
-from app.routers import auth, projects, tasks, documents, kanban
+from app.core.database import engine, Base, get_db, ensure_runtime_schema
+from app.routers import auth, projects, tasks, documents, kanban, worklogs
 
 # 创建数据库表
+ensure_runtime_schema()
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="工作团队系统", version="1.0.0")
+app = FastAPI(title="徐东摆地摊", version="1.0.0")
 
 # CORS
 app.add_middleware(
@@ -39,6 +40,7 @@ app.include_router(projects.router, prefix="/api/projects", tags=["项目管理"
 app.include_router(kanban.router, prefix="/api/kanban", tags=["看板"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["任务"])
 app.include_router(documents.router, prefix="/api/documents", tags=["文档中心"])
+app.include_router(worklogs.router, prefix="/api/worklogs", tags=["工作日志"])
 
 
 @app.get("/health")

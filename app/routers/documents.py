@@ -69,9 +69,6 @@ def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在")
-    # 非创建者需检查权限
-    if doc.creator_id != current_user.id and current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="无编辑权限")
 
     if data.title is not None:
         doc.title = data.title

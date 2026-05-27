@@ -8,7 +8,7 @@ from typing import List
 from app.core.database import get_db
 from app.models.models import User, Project, TaskColumn, UserRole
 from app.schemas.schemas import ProjectCreate, ProjectUpdate, ProjectResponse
-from app.routers.auth import get_current_user, require_admin
+from app.routers.auth import get_current_user
 
 router = APIRouter()
 
@@ -86,10 +86,12 @@ def update_project(project_id: int, data: ProjectUpdate, db: Session = Depends(g
 
 
 @router.delete("/{project_id}")
-def delete_project(project_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+def delete_project(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
+    if current_user.username != "mac":
+        raise HTTPException(status_code=403, detail="只有 mac 用户可以删除项目")
     db.delete(project)
     db.commit()
     return {"ok": True}

@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.models.models import User, Project, TaskColumn, Task, UserRole
 from app.schemas.schemas import ColumnCreate, ColumnUpdate, ColumnResponse, TaskMove
 from app.routers.auth import get_current_user, require_admin
+from app.routers.tasks import build_task_response
 
 router = APIRouter()
 
@@ -20,7 +21,7 @@ def get_kanban(project_id: int, db: Session = Depends(get_db), current_user: Use
     for col in columns:
         tasks = db.query(Task).filter(Task.column_id == col.id).order_by(Task.order).all()
         col_data = ColumnResponse.model_validate(col)
-        col_data.tasks = tasks
+        col_data.tasks = [build_task_response(task) for task in tasks]
         result.append(col_data)
     return result
 

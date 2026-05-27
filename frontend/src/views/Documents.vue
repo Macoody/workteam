@@ -1,105 +1,88 @@
 <template>
-  <div class="docs-page">
-    <div class="logo">徐东摆地摊</div>
-    <el-container>
-      <el-aside class="sidebar">
-        <div class="sidebar-footer">
-          <div class="user-name">{{ auth.user?.display_name }}</div>
-        </div>
-        <router-link to="/dashboard" class="nav-item">总览</router-link>
-        <router-link to="/projects" class="nav-item">项目</router-link>
-        <router-link to="/documents" class="nav-item active">文档中心</router-link>
-      </el-aside>
-      <el-main class="main">
-        <header class="header">
-          <span>文档中心</span>
-          <div class="header-actions">
-            <el-button type="primary" size="small" @click="showCreate = true">新建文档</el-button>
-            <el-button size="small" @click="loadDocs">刷新</el-button>
-          </div>
-        </header>
-        <div class="section">
-          <div v-if="docs.length === 0" class="el-empty">暂无文档</div>
-          <div v-else class="doc-grid">
-            <div v-for="d in docs" :key="d.id" class="doc-card" @click="$router.push(`/documents/${d.id}`)">
-              <div class="doc-icon">📄</div>
-              <div class="doc-info">
-                <div class="doc-title">{{ d.title }}</div>
-                <div class="doc-meta">{{ d.created_at?.slice(0, 10) }} · {{ d.file_type || '文档' }}</div>
-              </div>
-              <div class="doc-actions">
-                <el-tag v-if="d.share_token" type="success" size="small">已分享</el-tag>
-                <el-button size="small" @click.stop="shareDoc(d)">分享</el-button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </el-main>
-    </el-container>
+  <AppShell title="文档中心" description="把过程资料和输出文档集中沉淀，方便项目协作和后续复用。">
+    <template #actions>
+      <el-button type="primary" @click="showCreate = true">新建文档</el-button>
+      <el-button @click="loadDocs">刷新</el-button>
+    </template>
 
-    <el-dialog v-model="showCreate" title="新建文档" width="400px">
+    <div v-if="docs.length === 0" class="empty-card">还没有文档，先创建一篇项目记录或说明文档。</div>
+    <div v-else class="doc-grid">
+      <div v-for="doc in docs" :key="doc.id" class="doc-card" @click="$router.push(`/documents/${doc.id}`)">
+        <div style="display: flex; justify-content: space-between; gap: 12px; align-items: flex-start">
+          <div class="pill">{{ docTypeLabel(doc.doc_type) }}</div>
+          <el-tag v-if="doc.is_public" type="success" effect="light">已分享</el-tag>
+        </div>
+        <div style="margin-top: 18px" class="item-title">{{ doc.title }}</div>
+        <div class="item-meta">创建于 {{ formatDate(doc.created_at) }}<span v-if="doc.updated_at"> · 更新于 {{ formatDate(doc.updated_at) }}</span></div>
+        <div style="margin-top: 18px; display: flex; justify-content: space-between; align-items: center">
+          <span class="muted">{{ doc.view_count || 0 }} 次浏览</span>
+          <el-button size="small" @click.stop="shareDoc(doc)">分享</el-button>
+        </div>
+      </div>
+    </div>
+
+    <el-dialog v-model="showCreate" title="新建文档" width="420px">
       <el-form :model="form" label-position="top" @submit.prevent="handleCreate">
         <el-form-item label="文档标题">
           <el-input v-model="form.title" placeholder="输入文档标题" />
         </el-form-item>
         <el-form-item label="文档类型">
-          <el-select v-model="form.type" style="width:100%">
-            <el-option label="Word" value="doc" />
-            <el-option label="Excel" value="sheet" />
-            <el-option label="PPT" value="ppt" />
+          <el-select v-model="form.doc_type" style="width: 100%">
+            <el-option label="文档" value="doc" />
+            <el-option label="表格" value="sheet" />
+            <el-option label="演示" value="ppt" />
             <el-option label="其他" value="file" />
           </el-select>
         </el-form-item>
-        <el-form-item>
-          <el-upload :auto-upload="false" :limit="1" ref="uploadRef">
-            <el-button type="primary">上传文件</el-button>
-          </el-upload>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="loading" native-type="submit" style="width:100%" @click="handleCreate">创建</el-button>
-        </el-form-item>
+        <el-button type="primary" :loading="loading" native-type="submit" style="width: 100%" @click="handleCreate">
+          创建文档
+        </el-button>
       </el-form>
     </el-dialog>
 
-    <el-dialog v-model="shareDialog" title="分享文档" width="400px">
-      <div v-if="shareLink" class="share-result">
-        <p>分享链接已生成：</p>
-        <el-input v-model="shareLink" readonly />
-        <el-button type="primary" size="small" @click="copyLink" style="margin-top:10px">复制链接</el-button>
+    <el-dialog v-model="shareDialog" title="分享文档" width="420px">
+      <div v-if="shareLink">
+        <div class="muted">分享链接已生成</div>
+        <el-input v-model="shareLink" readonly style="margin-top: 10px" />
+        <el-button type="primary" size="small" style="margin-top: 12px" @click="copyLink">复制链接</el-button>
       </div>
       <div v-else>
-        <p>访问权限：</p>
-        <el-select v-model="sharePerm" style="width:100%">
-          <el-option label="仅查看" value="read" />
+        <div class="muted" style="margin-bottom: 10px">设置访问权限后生成链接</div>
+        <el-select v-model="sharePerm" style="width: 100%">
+          <el-option label="仅查看" value="readonly" />
           <el-option label="可编辑" value="write" />
         </el-select>
-        <el-button type="primary" :loading="genLoading" @click="genShare" style="margin-top:15px;width:100%">生成分享链接</el-button>
+        <el-button type="primary" :loading="genLoading" style="margin-top: 14px; width: 100%" @click="genShare">
+          生成分享链接
+        </el-button>
       </div>
     </el-dialog>
-  </div>
+  </AppShell>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
+import dayjs from 'dayjs'
 import { useAuthStore } from '@/stores/auth'
-import api from '@/api'
 import { ElMessage } from 'element-plus'
+import AppShell from '@/components/AppShell.vue'
+import api from '@/api'
 
 const auth = useAuthStore()
 const docs = ref([])
 const showCreate = ref(false)
 const loading = ref(false)
-const form = reactive({ title: '', type: 'doc' })
+const form = reactive({ title: '', doc_type: 'doc', content: '' })
 
 const shareDialog = ref(false)
 const shareLink = ref('')
 const shareDocId = ref(null)
-const sharePerm = ref('read')
+const sharePerm = ref('readonly')
 const genLoading = ref(false)
 
 onMounted(async () => {
   await auth.getMe()
-  loadDocs()
+  await loadDocs()
 })
 
 async function loadDocs() {
@@ -107,33 +90,38 @@ async function loadDocs() {
 }
 
 async function handleCreate() {
-  if (!form.title) { ElMessage.warning('请输入标题'); return }
+  if (!form.title) {
+    ElMessage.warning('请输入标题')
+    return
+  }
   loading.value = true
   try {
     await api.post('/documents', form)
     ElMessage.success('创建成功')
     showCreate.value = false
-    loadDocs()
-  } catch (e) {
+    form.title = ''
+    form.doc_type = 'doc'
+    await loadDocs()
+  } catch {
     ElMessage.error('创建失败')
   } finally {
     loading.value = false
   }
 }
 
-async function shareDoc(doc) {
+function shareDoc(doc) {
   shareDocId.value = doc.id
-  shareLink.value = doc.share_token ? `${window.location.origin}/share/${doc.share_token}` : ''
-  sharePerm.value = 'read'
+  shareLink.value = doc.share_token ? `${window.location.origin}/api/documents/shared/${doc.share_token}` : ''
+  sharePerm.value = doc.share_mode || 'readonly'
   shareDialog.value = true
 }
 
 async function genShare() {
   genLoading.value = true
   try {
-    const res = await api.post(`/documents/${shareDocId.value}/share`, { permission: sharePerm.value })
-    shareLink.value = `${window.location.origin}/share/${res.token}`
-  } catch (e) {
+    const res = await api.post(`/documents/${shareDocId.value}/share?mode=${sharePerm.value}&expire_hours=72`)
+    shareLink.value = `${window.location.origin}${res.share_url}`
+  } catch {
     ElMessage.error('生成失败')
   } finally {
     genLoading.value = false
@@ -144,27 +132,15 @@ function copyLink() {
   navigator.clipboard.writeText(shareLink.value)
   ElMessage.success('已复制')
 }
-</script>
 
-<style scoped>
-.docs-page { display: flex; min-height: 100vh; }
-.logo { position: fixed; top: 0; left: 0; width: 220px; height: 60px; background: #1a1a2e; color: white; display: flex; align-items: center; padding: 0 20px; font-size: 14px; font-weight: bold; z-index: 10; }
-.sidebar { width: 220px; background: #1a1a2e; color: #fff; display: flex; flex-direction: column; padding-top: 60px; position: fixed; top: 0; left: 0; height: 100vh; }
-.sidebar-footer { padding: 20px; border-bottom: 1px solid rgba(255,255,255,.1); }
-.user-name { font-size: 14px; font-weight: 600; }
-.nav-item { display: flex; align-items: center; gap: 10px; padding: 14px 20px; color: #a0aec0; text-decoration: none; transition: .2s; border-bottom: 1px solid rgba(255,255,255,.05); }
-.nav-item:hover, .nav-item.active { background: rgba(255,255,255,.08); color: #fff; }
-.main { margin-left: 220px; flex: 1; padding: 30px 40px; overflow-y: auto; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-.header span { font-size: 24px; font-weight: 700; color: #1a1a2e; }
-.header-actions { display: flex; gap: 10px; }
-.section { }
-.doc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-.doc-card { background: white; border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; box-shadow: 0 2px 12px rgba(0,0,0,.06); transition: transform 0.2s; }
-.doc-card:hover { transform: translateY(-2px); }
-.doc-icon { font-size: 32px; }
-.doc-info { flex: 1; }
-.doc-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; color: #1a1a2e; }
-.doc-meta { font-size: 12px; color: #888; }
-.doc-actions { display: flex; align-items: center; gap: 8px; }
-</style>
+function docTypeLabel(type) {
+  if (type === 'sheet') return '表格'
+  if (type === 'ppt') return '演示'
+  if (type === 'file') return '文件'
+  return '文档'
+}
+
+function formatDate(value) {
+  return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '--'
+}
+</script>

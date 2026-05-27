@@ -19,11 +19,11 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
-    email = Column(String(100), unique=True, index=True)
     phone = Column(String(20), unique=True)
     password_hash = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), default=UserRole.MEMBER)
     display_name = Column(String(100))
+    color = Column(String(20), default="#93c5fd")
     avatar = Column(String(500))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     is_active = Column(Boolean, default=True)
@@ -66,8 +66,12 @@ class Task(Base):
     title = Column(String(500), nullable=False)
     description = Column(Text)
     priority = Column(String(20), default="medium")
+    node_output = Column(Text)
+    linked_document_id = Column(Integer)
     assignee_id = Column(Integer, ForeignKey("users.id"))
     due_date = Column(DateTime(timezone=True))
+    delivery_dates = Column(Text)
+    completed_by = Column(Text)
     tags = Column(Text)
     order = Column(Integer, default=0)
     view_count = Column(Integer, default=0)
@@ -161,3 +165,16 @@ class FileAsset(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     uploader = relationship("User")
+
+
+class WorkLog(Base):
+    __tablename__ = "work_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    log_date = Column(DateTime(timezone=True), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    user = relationship("User")

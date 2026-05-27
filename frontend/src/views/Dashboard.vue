@@ -1,115 +1,186 @@
 <template>
-  <div class="dashboard">
-    <div class="logo">徐东摆地摊</div>
-    <el-container>
-      <el-aside class="sidebar">
-        <div class="sidebar-footer">
-          <div class="user-info">
-            <div class="user-name">{{ auth.user?.display_name || auth.user?.username }}</div>
-            <div class="user-role">{{ auth.user?.role }}</div>
-          </div>
-        </div>
-        <router-link to="/dashboard" class="nav-item active">
-          <span>总览</span>
-        </router-link>
-        <router-link to="/projects" class="nav-item">
-          <span>项目</span>
-        </router-link>
-        <router-link to="/documents" class="nav-item">
-          <span>文档中心</span>
-        </router-link>
-      </el-aside>
-      <el-main class="main">
-        <header class="header">
-          <span>仪表盘</span>
-          <el-button size="small" @click="auth.logout()">退出</el-button>
-        </header>
-        <div class="section">
-          <div class="stats">
-            <div class="stat-card">
-              <div class="stat-num">{{ stats.projects }}</div>
-              <div class="stat-label">项目总数</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-num">{{ stats.tasks }}</div>
-              <div class="stat-label">任务总数</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-num">{{ stats.my_tasks }}</div>
-              <div class="stat-label">我的任务</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-num">{{ stats.documents }}</div>
-              <div class="stat-label">文档数量</div>
-            </div>
-          </div>
-          <h3 class="task-list-title">任务列表</h3>
-          <div v-if="recentTasks.length === 0" class="el-empty">暂无任务</div>
-          <div v-else class="task-list">
-            <div v-for="task in recentTasks" :key="task.id" class="task-item">
-              <div class="task-title">{{ task.title }}</div>
-              <div class="task-project">{{ task.project_id }}</div>
-              <el-tag :type="task.priority === 'high' ? 'danger' : task.priority === 'low' ? 'info' : 'warning'" size="small">
-                {{ task.priority }}
-              </el-tag>
+  <AppShell title="工作总览" description="快速查看项目规模、近期任务和当前协作节奏。">
+    <div class="stats-grid">
+      <div v-for="item in statCards" :key="item.label" class="stat-card">
+        <div class="stat-label">{{ item.label }}</div>
+        <div class="stat-value">{{ item.value }}</div>
+        <div class="stat-footnote">{{ item.footnote }}</div>
+      </div>
+    </div>
+
+    <div class="split-layout">
+      <section class="panel">
+        <h3 class="section-title">近期任务</h3>
+        <div v-if="recentTasks.length === 0" class="empty-card">还没有任务，先从项目看板里创建第一条任务。</div>
+        <div v-else class="simple-list">
+          <div v-for="task in recentTasks" :key="task.id" class="simple-list-item">
+            <span class="status-pill" :style="statusPillStyle(task)">
+              {{ resolveTaskStatus(task) }}
+            </span>
+            <div class="item-main">
+              <div class="item-title">{{ task.title }}</div>
+              <div class="item-meta">
+                {{ resolveProjectName(task.project_id) }}
+                <span v-if="resolveUser(task.assignee_id)" class="meta-separator">·</span>
+                <span
+                  v-if="resolveUser(task.assignee_id)"
+                  class="user-pill"
+                  :style="{ background: resolveUser(task.assignee_id).color || '#93c5fd' }"
+                >
+                  {{ resolveUser(task.assignee_id).display_name || resolveUser(task.assignee_id).username }}
+                </span>
+                <span v-if="latestDeliveryDate(task)"> · 交付 {{ formatDate(latestDeliveryDate(task)) }}</span>
+              </div>
             </div>
           </div>
         </div>
-      </el-main>
-    </el-container>
-  </div>
+      </section>
+
+      <section class="panel">
+        <h3 class="section-title">当前状态</h3>
+        <div class="simple-list">
+          <div class="simple-list-item">
+            <div class="item-main">
+              <div class="item-title">我的待办</div>
+              <div class="item-meta">当前账号名下的任务数</div>
+            </div>
+            <strong>{{ stats.myTasks }}</strong>
+          </div>
+          <div class="simple-list-item">
+            <div class="item-main">
+              <div class="item-title">文档沉淀</div>
+              <div class="item-meta">已经创建的文档数量</div>
+            </div>
+            <strong>{{ stats.documents }}</strong>
+          </div>
+          <div class="simple-list-item">
+            <div class="item-main">
+              <div class="item-title">活跃项目</div>
+              <div class="item-meta">当前系统中的项目总数</div>
+            </div>
+            <strong>{{ stats.projects }}</strong>
+          </div>
+        </div>
+      </section>
+    </div>
+  </AppShell>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import dayjs from 'dayjs'
 import { useAuthStore } from '@/stores/auth'
+import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
 
 const auth = useAuthStore()
-const stats = ref({ projects: 0, tasks: 0, my_tasks: 0, documents: 0 })
+const stats = ref({ projects: 0, tasks: 0, myTasks: 0, documents: 0 })
 const recentTasks = ref([])
+const projects = ref([])
+const users = ref([])
+const columnsById = ref({})
+
+const statCards = computed(() => [
+  { label: '项目总数', value: stats.value.projects, footnote: '已创建的协作空间' },
+  { label: '任务总数', value: stats.value.tasks, footnote: '系统中的全部任务' },
+  { label: '我的任务', value: stats.value.myTasks, footnote: '待继续推进的事项' },
+  { label: '文档数量', value: stats.value.documents, footnote: '沉淀中的知识资料' }
+])
 
 onMounted(async () => {
   await auth.getMe()
   try {
-    const [projects, tasks, myTasks, docs] = await Promise.all([
+    const [projectList, taskList, myTasks, docs, userList] = await Promise.all([
       api.get('/projects'),
       api.get('/tasks'),
       api.get('/tasks?my_tasks=true'),
-      api.get('/documents')
+      api.get('/documents'),
+      api.get('/auth/users')
     ])
+    projects.value = projectList || []
+    users.value = userList || []
+    const kanbanLists = await Promise.all(
+      (projectList || []).map(project => api.get(`/kanban/project/${project.id}`))
+    )
+    const nextColumnsById = {}
+    kanbanLists.flat().forEach(column => {
+      nextColumnsById[column.id] = {
+        name: column.name,
+        color: column.color || '#94a3b8'
+      }
+    })
+    columnsById.value = nextColumnsById
     stats.value = {
-      projects: Array.isArray(projects) ? projects.length : 0,
-      tasks: Array.isArray(tasks) ? tasks.length : 0,
-      my_tasks: Array.isArray(myTasks) ? myTasks.length : 0,
+      projects: Array.isArray(projectList) ? projectList.length : 0,
+      tasks: Array.isArray(taskList) ? taskList.length : 0,
+      myTasks: Array.isArray(myTasks) ? myTasks.length : 0,
       documents: Array.isArray(docs) ? docs.length : 0
     }
-    recentTasks.value = (tasks || []).slice(0, 10)
-  } catch (e) {
-    console.error(e)
+    recentTasks.value = (taskList || []).slice(0, 8)
+  } catch (error) {
+    console.error(error)
   }
 })
+
+function resolveProjectName(projectId) {
+  const project = projects.value.find(item => item.id === projectId)
+  return project?.name || `项目 #${projectId}`
+}
+
+function resolveUser(userId) {
+  if (!userId) return null
+  return users.value.find(item => item.id === userId) || null
+}
+
+function resolveTaskStatus(task) {
+  return columnsById.value[task.column_id]?.name || '未分配状态'
+}
+
+function statusPillStyle(task) {
+  const color = columnsById.value[task.column_id]?.color || '#94a3b8'
+  return {
+    background: `${color}1f`,
+    color,
+    boxShadow: `inset 0 0 0 1px ${color}33`
+  }
+}
+
+function latestDeliveryDate(task) {
+  const dates = task?.delivery_dates || []
+  return dates[dates.length - 1] || task?.due_date || null
+}
+
+function formatDate(value) {
+  return dayjs(value).format('MM-DD HH:mm')
+}
 </script>
 
 <style scoped>
-.dashboard { display: flex; height: 100vh; background: #f5f5f5; }
-.logo { position: fixed; top: 0; left: 0; width: 200px; height: 60px; background: #545c64; color: white; display: flex; align-items: center; padding: 0 20px; font-size: 14px; font-weight: bold; z-index: 10; }
-.sidebar { width: 200px; background: #fff; border-right: 1px solid #eee; padding-top: 60px; }
-.sidebar-footer { padding: 10px; border-bottom: 1px solid #eee; }
-.user-name { font-weight: bold; font-size: 14px; }
-.user-role { font-size: 12px; color: #999; }
-.nav-item { display: block; padding: 12px 20px; color: #333; text-decoration: none; border-bottom: 1px solid #f0f0f0; }
-.nav-item.active { background: #ecf5ff; color: #409eff; }
-.main { margin-left: 200px; }
-.header { padding: 15px 20px; background: white; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-.section { padding: 20px; }
-.stats { display: flex; gap: 20px; margin-bottom: 30px; }
-.stat-card { flex: 1; background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-.stat-num { font-size: 28px; font-weight: bold; color: #409eff; }
-.stat-label { color: #666; margin-top: 5px; }
-.task-list-title { margin-bottom: 15px; font-size: 16px; }
-.task-list { background: white; border-radius: 8px; overflow: hidden; }
-.task-item { padding: 12px 15px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; }
-.task-title { flex: 1; font-weight: 500; }
-.task-project { color: #999; font-size: 12px; }
+.meta-separator {
+  margin: 0 6px;
+}
+
+.user-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
 </style>
