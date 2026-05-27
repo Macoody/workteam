@@ -114,7 +114,7 @@ def require_admin(current_user: User = Depends(get_current_user)):
 
 @router.post("/register", response_model=TokenResponse)
 def register(data: UserCreate, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.username == data.username).first():
+    if db.query(User).filter(User.username == data.username, User.is_active == True).first():
         raise HTTPException(status_code=400, detail="用户名已存在")
     
     user = User(
@@ -137,7 +137,7 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 def login(data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == data.username).first()
+    user = db.query(User).filter(User.username == data.username, User.is_active == True).first()
     if not user:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     
