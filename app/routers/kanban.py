@@ -31,7 +31,7 @@ def create_column(project_id: int, data: ColumnCreate, db: Session = Depends(get
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
-    if current_user.role != UserRole.ADMIN and project.owner_id != current_user.id:
+    if current_user.role.value != "admin" and project.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="无权限")
     
     col = TaskColumn(project_id=project_id, **data.model_dump())
@@ -48,7 +48,7 @@ def update_column(column_id: int, data: ColumnUpdate, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="列不存在")
     
     project = db.query(Project).filter(Project.id == col.project_id).first()
-    if current_user.role != UserRole.ADMIN and project.owner_id != current_user.id:
+    if current_user.role.value != "admin" and project.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="无权限")
     
     if data.name is not None:
