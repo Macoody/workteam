@@ -26,6 +26,17 @@
                 <div class="project-name">{{ p.name }}</div>
                 <div class="project-meta">创建于 {{ p.created_at?.slice(0, 10) }}</div>
               </div>
+              <div class="project-actions" @click.stop>
+                <el-dropdown trigger="click">
+                  <el-button size="small" text>···</el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item @click="openEdit(p)">修改名称</el-dropdown-item>
+                      <el-dropdown-item v-if="auth.user?.role === 'admin'" @click="handleDelete(p.id)" style="color:#f56c6c">删除项目</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </div>
             </div>
           </div>
         </div>
@@ -45,6 +56,17 @@
         </el-form-item>
       </el-form>
     </el-dialog>
+
+    <el-dialog v-model="showEdit" title="修改项目名称" width="400px">
+      <el-form :model="editForm" label-position="top" @submit.prevent="handleEdit">
+        <el-form-item label="项目名称">
+          <el-input v-model="editForm.name" placeholder="请输入项目名称" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :loading="loading" native-type="submit" style="width:100%" @click="handleEdit">保存</el-button>
+        </el-form-item>
+      </el-form>
+    </el-dialog>
   </div>
 </template>
 
@@ -53,18 +75,52 @@ import { ref, reactive, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
 import { ElMessage } from 'element-plus'
+import api from '@/api'
 
 const auth = useAuthStore()
 const projectStore = useProjectStore()
 const showCreate = ref(false)
+const showEdit = ref(false)
 const loading = ref(false)
 const form = reactive({ name: '', description: '' })
+const editForm = reactive({ id: null, name: '' })
 const projects = ref([])
 
 onMounted(async () => {
   await auth.getMe()
   projects.value = await projectStore.fetchProjects()
 })
+
+function openEdit(p) {
+  editForm.id = p.id
+  editForm.name = p.name
+  showEdit.value = true
+}
+
+async function handleEdit() {
+  if (!editForm.name) { ElMessage.warning('请输入项目名称'); return }
+  loading.value = true
+  try {
+    await api.put(`/projects/${editForm.id}`, { name: editForm.name })
+    ElMessage.success('修改成功')
+    showEdit.value = false
+    projects.value = await projectStore.fetchProjects()
+  } catch (e) {
+    ElMessage.error('修改失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleDelete(id) {
+  try {
+    await api.delete(`/projects/${id}`)
+    ElMessage.success('删除成功')
+    projects.value = await projectStore.fetchProjects()
+  } catch (e) {
+    ElMessage.error('删除失败')
+  }
+}
 
 async function handleCreate() {
   if (!form.name) { ElMessage.warning('请输入项目名称'); return }
@@ -101,4 +157,7 @@ async function handleCreate() {
 .project-info { padding: 15px; }
 .project-name { font-weight: bold; font-size: 16px; margin-bottom: 5px; }
 .project-meta { font-size: 12px; color: #999; }
+.project-actions { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity 0.2s; }
+.project-card:hover .project-actions { opacity: 1; }
+.project-card { position: relative; }
 </style>

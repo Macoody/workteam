@@ -17,12 +17,13 @@
             <span class="doc-title">{{ doc?.title }}</span>
           </div>
           <div class="header-right">
+            <span class="save-status" :class="saveStatusClass">{{ saveStatusText }}</span>
             <el-button size="small" @click="shareDoc">分享文档</el-button>
-            <el-button size="small" @click="saveDoc">保存</el-button>
+            <el-button size="small" type="primary" @click="saveDoc">保存</el-button>
           </div>
         </header>
         <div class="editor-toolbar">
-          <el-button size="small" @click="execCmd('bold')" :type="activeMarks.includes('bold')?'primary':'default'">B</el-button>
+          <el-button size="small" @click="execCmd('bold')" :type="activeMarks.includes('bold')?'primary':'default'"><b>B</b></el-button>
           <el-button size="small" @click="execCmd('italic')" :type="activeMarks.includes('italic')?'primary':'default'"><i>I</i></el-button>
           <el-button size="small" @click="execCmd('strike')" :type="activeMarks.includes('strike')?'primary':'default'"><s>S</s></el-button>
           <el-divider direction="vertical" />
@@ -46,7 +47,7 @@
         <div v-if="attachments.length" class="attachment-list">
           <h4>附件</h4>
           <div v-for="att in attachments" :key="att.id" class="attachment-item">
-            <span class="att-name">{{ att.filename }}</span>
+            <span class="att-name">{{ att.original_name || att.filename }}</span>
             <el-button size="small" type="danger" @click="delAttachment(att.id)">删除</el-button>
           </div>
         </div>
@@ -67,7 +68,7 @@
           <div v-else>
             <el-form-item label="访问权限">
               <el-select v-model="sharePerm" style="width:100%">
-                <el-option label="仅查看" value="read" />
+                <el-option label="仅查看" value="readonly" />
                 <el-option label="可编辑" value="write" />
               </el-select>
             </el-form-item>
@@ -87,15 +88,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Editor, EditorContent } from '@tiptap/vue-3'
+import { Editor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Image from '@tiptap/extension-image'
 import api from '@/api'
 import { ElMessage } from 'element-plus'
+import dayjs from 'dayjs'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -109,9 +111,17 @@ const showUpload = ref(false)
 const uploadRef = ref(null)
 const uploading = ref(false)
 
+// 保存状态
+const saveStatus = ref('saved') // 'saved' | 'saving' | 'unsaved'
+const saveStatusText = ref('已保存')
+const saveStatusClass = ref('status-saved')
+
+let autoSaveTimer = null
+const AUTO_SAVE_DELAY = 3000 // 3秒无操作自动保存
+
 const shareDialog = ref(false)
 const shareLink = ref('')
-const sharePerm = ref('read')
+const sharePerm = ref('readonly')
 const genLoading = ref(false)
 
 const linkDialog = ref(false)
@@ -140,16 +150,62 @@ function initEditor() {
       Image,
     ],
     content: doc.value?.content || '',
-    onUpdate: () => {},
-    onSelectionUpdate: () => {
-      const marks = []
-      editor.value?.state.selection.$from.parent.type.name
-      activeMarks.value = marks
+    onUpdate: ({ editor: e }) => {
+      triggerAutoSave()
+    },
+    onSelectionUpdate: ({ editor: e }) => {
+      updateActiveMarks()
     }
   })
 }
 
-onBeforeUnmount(() => editor.value?.destroy())
+function updateActiveMarks() {
+  const marks = []
+  if (!editor.value) return
+  editor.value.chain().command(({ commands }) => {
+    // 通过检测 active 状态获取当前 marks
+    return true
+  }).run()
+  // 更简单的方式：直接从 editor state 读取
+  const { selection } = editor.value.state
+  activeMarks.value = selection.$from.marks().map(m => m.type.name)
+}
+
+function triggerAutoSave() {
+  saveStatus.value = 'unsaved'
+  saveStatusText.value = '未保存'
+  saveStatusClass.value = 'status-unsaved'
+
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(() => {
+    autoSave()
+  }, AUTO_SAVE_DELAY)
+}
+
+async function autoSave() {
+  if (!doc.value || !editor.value) return
+  saveStatus.value = 'saving'
+  saveStatusText.value = '保存中...'
+  saveStatusClass.value = 'status-saving'
+
+  const content = editor.value.getHTML()
+  try {
+    await api.put(`/documents/${doc.value.id}`, { content })
+    saveStatus.value = 'saved'
+    saveStatusText.value = '已保存 ' + dayjs().format('HH:mm:ss')
+    saveStatusClass.value = 'status-saved'
+  } catch (e) {
+    console.error(e)
+    saveStatus.value = 'unsaved'
+    saveStatusText.value = '保存失败'
+    saveStatusClass.value = 'status-unsaved'
+  }
+}
+
+onBeforeUnmount(() => {
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
+  editor.value?.destroy()
+})
 
 function execCmd(command, value) {
   if (!editor.value) return
@@ -177,14 +233,9 @@ function undo() { editor.value?.chain().focus().undo().run() }
 function redo() { editor.value?.chain().focus().redo().run() }
 
 async function saveDoc() {
-  if (!doc.value) return
-  const content = editor.value?.getHTML() || ''
-  try {
-    await api.put(`/documents/${doc.value.id}`, { content })
-    ElMessage.success('保存成功')
-  } catch (e) {
-    ElMessage.error('保存失败')
-  }
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
+  await autoSave()
 }
 
 async function doUpload() {
@@ -224,8 +275,8 @@ async function shareDoc() {
 async function genShare() {
   genLoading.value = true
   try {
-    const res = await api.post(`/documents/${doc.value.id}/share`, { permission: sharePerm.value })
-    shareLink.value = `${location.origin}/share/${res.token}`
+    const res = await api.post(`/documents/${doc.value.id}/share?mode=${sharePerm.value}&expire_hours=72`)
+    shareLink.value = `${location.origin}/share/${res.share_token}`
   } catch (e) {
     ElMessage.error('生成失败')
   } finally {
@@ -251,8 +302,12 @@ function copyLink() {
 .header { padding: 12px 20px; background: white; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
 .header-flex { justify-content: space-between; }
 .header-left { display: flex; align-items: center; gap: 12px; }
-.header-right { display: flex; gap: 10px; }
+.header-right { display: flex; gap: 10px; align-items: center; }
 .doc-title { font-weight: bold; font-size: 16px; }
+.save-status { font-size: 12px; padding: 2px 8px; border-radius: 4px; }
+.status-saved { color: #67c23a; background: #f0f9eb; }
+.status-saving { color: #e6a23c; background: #fdf6ec; }
+.status-unsaved { color: #909399; background: #f4f4f5; }
 .editor-toolbar { padding: 8px 20px; background: #fafafa; border-bottom: 1px solid #eee; display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
 .editor-area { flex: 1; overflow-y: auto; padding: 20px; background: white; }
 .tiptap-editor { min-height: 400px; outline: none; }

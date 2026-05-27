@@ -147,13 +147,20 @@ const addTaskDialog = ref(false)
 const newTask = reactive({ title: '', description: '', priority: 'medium', assignee_id: null, due_date: null })
 const addColId = ref(null)
 const creating = ref(false)
-
 onMounted(async () => {
   await auth.getMe()
-  projects.value = await api.get('/projects')
-  if (projects.value.length) {
+  const proj_data = await api.get('/projects')
+  projects.value = proj_data
+  if (projects.value.length > 0) {
     selectedProject.value = projects.value[0].id
     await loadKanban()
+  }
+  // 加载成员列表（用于下拉选择负责人）
+  try {
+    const user_data = await api.get('/users')
+    users.value = user_data
+  } catch (e) {
+    console.error('loadUsers failed', e)
   }
 })
 

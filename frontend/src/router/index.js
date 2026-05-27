@@ -16,6 +16,7 @@ const routes = [
       { path: '', redirect: '/dashboard' },
       { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/Dashboard.vue') },
       { path: 'projects', name: 'Projects', component: () => import('@/views/Projects.vue') },
+      { path: 'projects/:id', name: 'ProjectDetail', component: () => import('@/views/ProjectDetail.vue') },
       { path: 'kanban/:projectId?', name: 'Kanban', component: () => import('@/views/Kanban.vue') },
       { path: 'tasks', name: 'Tasks', component: () => import('@/views/Tasks.vue') },
       { path: 'documents', name: 'Documents', component: () => import('@/views/Documents.vue') },
