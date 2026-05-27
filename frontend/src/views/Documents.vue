@@ -1,28 +1,41 @@
 <template>
   <div class="docs-page">
-    <div class="header">
-      <span>文档中心</span>
-      <div class="header-actions">
-        <el-button type="primary" size="small" @click="showCreate = true">新建文档</el-button>
-        <el-button size="small" @click="loadDocs">刷新</el-button>
-      </div>
-    </div>
-    <div class="section">
-      <div v-if="docs.length === 0" class="el-empty">暂无文档</div>
-      <div v-else class="doc-grid">
-        <div v-for="d in docs" :key="d.id" class="doc-card" @click="$router.push(`/documents/${d.id}`)">
-          <div class="doc-icon">📄</div>
-          <div class="doc-info">
-            <div class="doc-title">{{ d.title }}</div>
-            <div class="doc-meta">{{ d.created_at?.slice(0, 10) }} · {{ d.file_type || '文档' }}</div>
+    <div class="logo">徐东摆地摊</div>
+    <el-container>
+      <el-aside class="sidebar">
+        <div class="sidebar-footer">
+          <div class="user-name">{{ auth.user?.display_name }}</div>
+        </div>
+        <router-link to="/dashboard" class="nav-item">总览</router-link>
+        <router-link to="/projects" class="nav-item">项目</router-link>
+        <router-link to="/documents" class="nav-item active">文档中心</router-link>
+      </el-aside>
+      <el-main class="main">
+        <header class="header">
+          <span>文档中心</span>
+          <div class="header-actions">
+            <el-button type="primary" size="small" @click="showCreate = true">新建文档</el-button>
+            <el-button size="small" @click="loadDocs">刷新</el-button>
           </div>
-          <div class="doc-actions">
-            <el-tag v-if="d.share_token" type="success" size="small">已分享</el-tag>
-            <el-button size="small" @click.stop="shareDoc(d)">分享</el-button>
+        </header>
+        <div class="section">
+          <div v-if="docs.length === 0" class="el-empty">暂无文档</div>
+          <div v-else class="doc-grid">
+            <div v-for="d in docs" :key="d.id" class="doc-card" @click="$router.push(`/documents/${d.id}`)">
+              <div class="doc-icon">📄</div>
+              <div class="doc-info">
+                <div class="doc-title">{{ d.title }}</div>
+                <div class="doc-meta">{{ d.created_at?.slice(0, 10) }} · {{ d.file_type || '文档' }}</div>
+              </div>
+              <div class="doc-actions">
+                <el-tag v-if="d.share_token" type="success" size="small">已分享</el-tag>
+                <el-button size="small" @click.stop="shareDoc(d)">分享</el-button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      </el-main>
+    </el-container>
 
     <el-dialog v-model="showCreate" title="新建文档" width="400px">
       <el-form :model="form" label-position="top" @submit.prevent="handleCreate">
@@ -134,16 +147,24 @@ function copyLink() {
 </script>
 
 <style scoped>
-.docs-page { padding: 0; }
-.header { padding: 15px 20px; background: white; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+.docs-page { display: flex; min-height: 100vh; }
+.logo { position: fixed; top: 0; left: 0; width: 220px; height: 60px; background: #1a1a2e; color: white; display: flex; align-items: center; padding: 0 20px; font-size: 14px; font-weight: bold; z-index: 10; }
+.sidebar { width: 220px; background: #1a1a2e; color: #fff; display: flex; flex-direction: column; padding-top: 60px; position: fixed; top: 0; left: 0; height: 100vh; }
+.sidebar-footer { padding: 20px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.user-name { font-size: 14px; font-weight: 600; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 14px 20px; color: #a0aec0; text-decoration: none; transition: .2s; border-bottom: 1px solid rgba(255,255,255,.05); }
+.nav-item:hover, .nav-item.active { background: rgba(255,255,255,.08); color: #fff; }
+.main { margin-left: 220px; flex: 1; padding: 30px 40px; overflow-y: auto; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+.header span { font-size: 24px; font-weight: 700; color: #1a1a2e; }
 .header-actions { display: flex; gap: 10px; }
-.section { padding: 20px; }
+.section { }
 .doc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-.doc-card { background: white; border-radius: 8px; padding: 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.doc-card { background: white; border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; box-shadow: 0 2px 12px rgba(0,0,0,.06); transition: transform 0.2s; }
 .doc-card:hover { transform: translateY(-2px); }
 .doc-icon { font-size: 32px; }
 .doc-info { flex: 1; }
-.doc-title { font-weight: bold; font-size: 15px; margin-bottom: 4px; }
-.doc-meta { font-size: 12px; color: #999; }
+.doc-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; color: #1a1a2e; }
+.doc-meta { font-size: 12px; color: #888; }
 .doc-actions { display: flex; align-items: center; gap: 8px; }
 </style>
