@@ -51,7 +51,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { Odometer, FolderOpened, Grid, List, Document, Calendar } from '@element-plus/icons-vue'
+import { Odometer, FolderOpened, Grid, List, Document, Calendar, User } from '@element-plus/icons-vue'
 import logoXudong from '@/assets/logo-xudong.svg'
 
 defineProps({
@@ -68,6 +68,7 @@ defineProps({
 const navItems = [
   { to: '/dashboard', label: '总览', icon: Odometer },
   { to: '/projects', label: '项目', icon: FolderOpened },
+  { to: '/members', label: '成员', icon: User },
   { to: '/kanban', label: '看板', icon: Grid },
   { to: '/tasks', label: '任务', icon: List },
   { to: '/documents', label: '文档', icon: Document },
