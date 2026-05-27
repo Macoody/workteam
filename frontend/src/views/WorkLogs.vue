@@ -137,7 +137,7 @@ async function submitLog() {
   saving.value = true
   try {
     const payload = {
-      log_date: dayjs().toISOString(),
+      log_date: dayjs().format('YYYY-MM-DDTHH:mm:ss'),
       content: form.content.trim()
     }
     await api.post('/worklogs', payload)

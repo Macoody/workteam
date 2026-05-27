@@ -19,10 +19,7 @@ def list_logs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """查询日志列表。admin 可看所有人，普通成员只看自己的。"""
     query = db.query(WorkLog)
-    if current_user.role.value != "admin":
-        query = query.filter(WorkLog.user_id == current_user.id)
     if date_str:
         target = datetime.fromisoformat(date_str)
         query = query.filter(
