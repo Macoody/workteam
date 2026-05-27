@@ -9,7 +9,13 @@ export const useAuthStore = defineStore('auth', {
   }),
   actions: {
     async login(username, password) {
-      const data = await api.post('/auth/login', { username, password })
+      // 后端 OAuth2PasswordRequestForm 需要 form-data 格式
+      const params = new URLSearchParams()
+      params.append('username', username)
+      params.append('password', password)
+      const data = await axios.post('/api/auth/login', params, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      })
       this.token = data.access_token || data.token
       localStorage.setItem('token', this.token)
       return data
