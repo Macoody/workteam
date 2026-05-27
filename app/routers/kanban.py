@@ -20,9 +20,16 @@ def get_kanban(project_id: int, db: Session = Depends(get_db), current_user: Use
     result = []
     for col in columns:
         tasks = db.query(Task).filter(Task.column_id == col.id).order_by(Task.order).all()
-        col_data = ColumnResponse.model_validate(col)
-        col_data.tasks = [build_task_response(task) for task in tasks]
-        result.append(col_data)
+        result.append(
+            ColumnResponse(
+                id=col.id,
+                project_id=col.project_id,
+                name=col.name,
+                order=col.order,
+                color=col.color,
+                tasks=[build_task_response(task) for task in tasks],
+            )
+        )
     return result
 
 

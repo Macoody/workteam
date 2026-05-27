@@ -59,7 +59,7 @@
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { useAuthStore } from '@/stores/auth'
 import { Editor, EditorContent } from '@tiptap/vue-3'
@@ -74,6 +74,7 @@ import api from '@/api'
 const AUTO_SAVE_DELAY = 1500
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const loading = ref(true)
 const doc = ref(null)

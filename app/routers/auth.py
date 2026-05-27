@@ -126,14 +126,17 @@ def require_admin(current_user: User = Depends(get_current_user)):
 
 @router.post("/register", response_model=TokenResponse)
 def register(data: UserCreate, db: Session = Depends(get_db)):
+    phone = _clean_optional(data.phone)
     existing = db.query(User).filter(User.username == data.username).first()
     if existing:
         if existing.is_active:
             raise HTTPException(status_code=400, detail="用户名已存在")
+        if phone and db.query(User).filter(User.phone == phone, User.id != existing.id).first():
+            raise HTTPException(status_code=400, detail="手机号已存在")
         # 被删掉的账号：重置密码+重新激活
         existing.password_hash = get_password_hash(data.password)
         existing.is_active = True
-        existing.phone = data.phone
+        existing.phone = phone
         db.commit()
         db.refresh(existing)
         access_token = create_access_token(data={"sub": str(existing.id)})
@@ -145,7 +148,7 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
         username=data.username,
         password_hash=get_password_hash(data.password),
         display_name=data.display_name or data.username,
-        phone=data.phone,
+        phone=phone,
         role=UserRole.MEMBER,
     )
     db.add(user)
@@ -202,7 +205,7 @@ def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_c
 
 
 @router.post("/users", response_model=UserResponse)
-def create_user(data: UserManageCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_user(data: UserManageCreate, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     phone = _clean_optional(data.phone)
     color = _clean_color(data.color)
 
@@ -231,7 +234,7 @@ def create_user(data: UserManageCreate, db: Session = Depends(get_db), current_u
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)
-def update_user(user_id: int, data: UserManageUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def update_user(user_id: int, data: UserManageUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -265,7 +268,7 @@ def update_user(user_id: int, data: UserManageUpdate, db: Session = Depends(get_
 
 
 @router.delete("/users/{user_id}")
-def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
