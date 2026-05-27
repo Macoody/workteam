@@ -99,14 +99,18 @@ onMounted(async () => {
     ])
     projects.value = projectList || []
     users.value = userList || []
-    const kanbanLists = await Promise.all(
+    const kanbanResults = await Promise.allSettled(
       (projectList || []).map(project => api.get(`/kanban/project/${project.id}`))
     )
     const nextColumnsById = {}
-    kanbanLists.flat().forEach(column => {
-      nextColumnsById[column.id] = {
-        name: column.name,
-        color: column.color || '#94a3b8'
+    kanbanResults.forEach(result => {
+      if (result.status === 'fulfilled') {
+        (result.value || []).forEach(column => {
+          nextColumnsById[column.id] = {
+            name: column.name,
+            color: column.color || '#94a3b8'
+          }
+        })
       }
     })
     columnsById.value = nextColumnsById
