@@ -13,7 +13,7 @@ export const useAuthStore = defineStore('auth', {
       const params = new URLSearchParams()
       params.append('username', username)
       params.append('password', password)
-      const data = await axios.post('/api/auth/login', params, {
+      const data = await api.post('/auth/login', params, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       })
       this.token = data.access_token || data.token

@@ -4,7 +4,7 @@
       <h1 class="title">徐东摆地摊团队协作系统</h1>
       <el-tabs v-model="activeTab" class="login-tabs">
         <el-tab-pane label="登录" name="login">
-          <el-form :model="loginForm" @submit.prevent="handleLogin">
+          <el-form :model="loginForm" label-position="top" @submit.prevent="handleLogin">
             <el-form-item label="用户名">
               <el-input v-model="loginForm.username" placeholder="输入用户名" />
             </el-form-item>
@@ -19,7 +19,7 @@
           </el-form>
         </el-tab-pane>
         <el-tab-pane label="注册" name="register">
-          <el-form :model="regForm" @submit.prevent="handleRegister" label-position="top">
+          <el-form :model="regForm" label-position="top" @submit.prevent="handleRegister">
             <el-form-item label="用户名">
               <el-input v-model="regForm.username" placeholder="设置用户名" />
             </el-form-item>
@@ -65,7 +65,7 @@ async function handleLogin() {
     ElMessage.success('登录成功')
     router.push('/dashboard')
   } catch (e) {
-    ElMessage.error('登录失败')
+    ElMessage.error(e?.response?.data?.detail || '登录失败，请检查用户名和密码')
   } finally {
     loading.value = false
   }
