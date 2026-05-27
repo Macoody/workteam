@@ -38,15 +38,33 @@
               {{ myTodayLog ? '更新日志' : '提交日志' }}
             </el-button>
           </div>
+          <!-- 成员筛选 -->
+          <div v-if="members.length" class="member-filter">
+            <button
+              type="button"
+              class="member-chip"
+              :class="{ active: selectedUserId === null }"
+              @click="selectedUserId = null"
+            >全部</button>
+            <button
+              v-for="member in members"
+              :key="member.id"
+              type="button"
+              class="member-chip"
+              :class="{ active: selectedUserId === member.id }"
+              :style="{ background: selectedUserId === member.id ? member.color : (member.color + '33') }"
+              @click="selectedUserId = selectedUserId === member.id ? null : member.id"
+            >{{ member.display_name || member.username }}</button>
+          </div>
         </div>
       </section>
 
       <!-- 历史日志列表 -->
       <section class="log-history">
-        <div v-if="loading && logs.length === 0" class="empty-card">加载中...</div>
-        <div v-else-if="logs.length === 0" class="empty-card">还没有日志，开始写第一条吧。</div>
+        <div v-if="loading && filteredLogs.length === 0" class="empty-card">加载中...</div>
+        <div v-else-if="filteredLogs.length === 0" class="empty-card">还没有日志，开始写第一条吧。</div>
         <div v-else class="log-list">
-          <div v-for="log in logs" :key="log.id" class="log-card">
+          <div v-for="log in filteredLogs" :key="log.id" class="log-card">
             <div class="log-card-header">
               <div class="log-meta">
                 <span class="log-author">
@@ -93,6 +111,8 @@ const auth = useAuthStore()
 const loading = ref(false)
 const saving = ref(false)
 const logs = ref([])
+const members = ref([])
+const selectedUserId = ref(null)
 const filterDate = ref(dayjs().format('YYYY-MM-DD'))
 const editDialog = ref(false)
 const editingLog = ref(null)
@@ -108,9 +128,15 @@ const myTodayLog = computed(() => {
   )
 })
 
+const filteredLogs = computed(() => {
+  if (!selectedUserId.value) return logs.value
+  return logs.value.filter(log => log.user_id === selectedUserId.value)
+})
+
 onMounted(async () => {
   await auth.getMe()
   await loadLogs()
+  await loadMembers()
 })
 
 async function loadLogs() {
@@ -126,6 +152,14 @@ async function loadLogs() {
     ElMessage.error('日志加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+async function loadMembers() {
+  try {
+    members.value = await api.get('/auth/users')
+  } catch (error) {
+    console.error(error)
   }
 }
 
@@ -316,5 +350,23 @@ function formatDate(value) {
   color: var(--wt-text);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.member-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.member-chip {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #0f172a;
 }
 </style>
