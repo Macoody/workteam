@@ -38,7 +38,7 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="最后使用" width="180">
+        <el-table-column label="最后活跃时间" width="180">
           <template #default="{ row }">
             <span :class="row.last_active_time ? '' : 'text-muted'">
               {{ formatDate(row.last_active_time) }}
