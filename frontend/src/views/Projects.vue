@@ -1,47 +1,32 @@
 <template>
   <div class="projects-page">
-    <div class="logo">徐东摆地摊</div>
-    <el-container>
-      <el-aside class="sidebar">
-        <div class="sidebar-footer">
-          <div class="user-info">
-            <div class="user-name">{{ auth.user?.display_name }}</div>
+    <div class="header">
+      <span>项目管理</span>
+      <el-button type="primary" size="small" @click="showCreate = true">新建项目</el-button>
+    </div>
+    <div class="section">
+      <div v-if="projects.length === 0" class="el-empty">暂无项目</div>
+      <div v-else class="project-grid">
+        <div v-for="p in projects" :key="p.id" class="project-card" @click="$router.push(`/kanban?project=${p.id}`)">
+          <div class="project-color" :style="{ background: p.color || '#409eff' }"></div>
+          <div class="project-info">
+            <div class="project-name">{{ p.name }}</div>
+            <div class="project-meta">创建于 {{ p.created_at?.slice(0, 10) }}</div>
+          </div>
+          <div class="project-actions" @click.stop>
+            <el-dropdown trigger="click">
+              <el-button size="small" text>···</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="openEdit(p)">修改名称</el-dropdown-item>
+                  <el-dropdown-item v-if="auth.user?.role === 'admin'" @click="handleDelete(p.id)" style="color:#f56c6c">删除项目</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
         </div>
-        <router-link to="/dashboard" class="nav-item">总览</router-link>
-        <router-link to="/projects" class="nav-item active">项目</router-link>
-        <router-link to="/documents" class="nav-item">文档中心</router-link>
-      </el-aside>
-      <el-main class="main">
-        <header class="header">
-          <span>项目管理</span>
-          <el-button type="primary" size="small" @click="showCreate = true">新建项目</el-button>
-        </header>
-        <div class="section">
-          <div v-if="projects.length === 0" class="el-empty">暂无项目</div>
-          <div v-else class="project-grid">
-            <div v-for="p in projects" :key="p.id" class="project-card" @click="$router.push(`/kanban?project=${p.id}`)">
-              <div class="project-color" :style="{ background: p.color || '#409eff' }"></div>
-              <div class="project-info">
-                <div class="project-name">{{ p.name }}</div>
-                <div class="project-meta">创建于 {{ p.created_at?.slice(0, 10) }}</div>
-              </div>
-              <div class="project-actions" @click.stop>
-                <el-dropdown trigger="click">
-                  <el-button size="small" text>···</el-button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item @click="openEdit(p)">修改名称</el-dropdown-item>
-                      <el-dropdown-item v-if="auth.user?.role === 'admin'" @click="handleDelete(p.id)" style="color:#f56c6c">删除项目</el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
-              </div>
-            </div>
-          </div>
-        </div>
-      </el-main>
-    </el-container>
+      </div>
+    </div>
 
     <el-dialog v-model="showCreate" title="新建项目" width="400px">
       <el-form :model="form" label-position="top" @submit.prevent="handleCreate">
@@ -140,18 +125,11 @@ async function handleCreate() {
 </script>
 
 <style scoped>
-.projects-page { display: flex; height: 100vh; background: #f5f5f5; }
-.logo { position: fixed; top: 0; left: 0; width: 200px; height: 60px; background: #545c64; color: white; display: flex; align-items: center; padding: 0 20px; font-size: 14px; font-weight: bold; z-index: 10; }
-.sidebar { width: 200px; background: #fff; border-right: 1px solid #eee; padding-top: 60px; }
-.sidebar-footer { padding: 10px; border-bottom: 1px solid #eee; }
-.user-name { font-weight: bold; }
-.nav-item { display: block; padding: 12px 20px; color: #333; text-decoration: none; border-bottom: 1px solid #f0f0f0; }
-.nav-item.active { background: #ecf5ff; color: #409eff; }
-.main { margin-left: 200px; }
+.projects-page { padding: 0; }
 .header { padding: 15px 20px; background: white; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
 .section { padding: 20px; }
 .project-grid { display: grid; grid-template-columns: repeat(auto-fill, 240px); gap: 20px; }
-.project-card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s; }
+.project-card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s; position: relative; }
 .project-card:hover { transform: translateY(-2px); }
 .project-color { height: 8px; }
 .project-info { padding: 15px; }
@@ -159,5 +137,4 @@ async function handleCreate() {
 .project-meta { font-size: 12px; color: #999; }
 .project-actions { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity 0.2s; }
 .project-card:hover .project-actions { opacity: 1; }
-.project-card { position: relative; }
 </style>

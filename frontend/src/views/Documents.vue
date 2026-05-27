@@ -1,41 +1,28 @@
 <template>
   <div class="docs-page">
-    <div class="logo">徐东摆地摊</div>
-    <el-container>
-      <el-aside class="sidebar">
-        <div class="sidebar-footer">
-          <div class="user-name">{{ auth.user?.display_name }}</div>
-        </div>
-        <router-link to="/dashboard" class="nav-item">总览</router-link>
-        <router-link to="/projects" class="nav-item">项目</router-link>
-        <router-link to="/documents" class="nav-item active">文档中心</router-link>
-      </el-aside>
-      <el-main class="main">
-        <header class="header">
-          <span>文档中心</span>
-          <div class="header-actions">
-            <el-button type="primary" size="small" @click="showCreate = true">新建文档</el-button>
-            <el-button size="small" @click="loadDocs">刷新</el-button>
+    <div class="header">
+      <span>文档中心</span>
+      <div class="header-actions">
+        <el-button type="primary" size="small" @click="showCreate = true">新建文档</el-button>
+        <el-button size="small" @click="loadDocs">刷新</el-button>
+      </div>
+    </div>
+    <div class="section">
+      <div v-if="docs.length === 0" class="el-empty">暂无文档</div>
+      <div v-else class="doc-grid">
+        <div v-for="d in docs" :key="d.id" class="doc-card" @click="$router.push(`/documents/${d.id}`)">
+          <div class="doc-icon">📄</div>
+          <div class="doc-info">
+            <div class="doc-title">{{ d.title }}</div>
+            <div class="doc-meta">{{ d.created_at?.slice(0, 10) }} · {{ d.file_type || '文档' }}</div>
           </div>
-        </header>
-        <div class="section">
-          <div v-if="docs.length === 0" class="el-empty">暂无文档</div>
-          <div v-else class="doc-grid">
-            <div v-for="d in docs" :key="d.id" class="doc-card" @click="$router.push(`/documents/${d.id}`)">
-              <div class="doc-icon">📄</div>
-              <div class="doc-info">
-                <div class="doc-title">{{ d.title }}</div>
-                <div class="doc-meta">{{ d.created_at?.slice(0, 10) }} · {{ d.file_type || '文档' }}</div>
-              </div>
-              <div class="doc-actions">
-                <el-tag v-if="d.share_token" type="success" size="small">已分享</el-tag>
-                <el-button size="small" @click.stop="shareDoc(d)">分享</el-button>
-              </div>
-            </div>
+          <div class="doc-actions">
+            <el-tag v-if="d.share_token" type="success" size="small">已分享</el-tag>
+            <el-button size="small" @click.stop="shareDoc(d)">分享</el-button>
           </div>
         </div>
-      </el-main>
-    </el-container>
+      </div>
+    </div>
 
     <el-dialog v-model="showCreate" title="新建文档" width="400px">
       <el-form :model="form" label-position="top" @submit.prevent="handleCreate">
@@ -147,14 +134,7 @@ function copyLink() {
 </script>
 
 <style scoped>
-.docs-page { display: flex; height: 100vh; background: #f5f5f5; }
-.logo { position: fixed; top: 0; left: 0; width: 200px; height: 60px; background: #545c64; color: white; display: flex; align-items: center; padding: 0 20px; font-size: 14px; font-weight: bold; z-index: 10; }
-.sidebar { width: 200px; background: #fff; border-right: 1px solid #eee; padding-top: 60px; }
-.sidebar-footer { padding: 10px; border-bottom: 1px solid #eee; }
-.user-name { font-weight: bold; }
-.nav-item { display: block; padding: 12px 20px; color: #333; text-decoration: none; border-bottom: 1px solid #f0f0f0; }
-.nav-item.active { background: #ecf5ff; color: #409eff; }
-.main { margin-left: 200px; }
+.docs-page { padding: 0; }
 .header { padding: 15px 20px; background: white; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
 .header-actions { display: flex; gap: 10px; }
 .section { padding: 20px; }
