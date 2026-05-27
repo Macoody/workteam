@@ -11,6 +11,7 @@ from datetime import datetime
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.models import User, Task, TaskColumn, Attachment, Comment, UserRole, Document
+from app.routers.auth import _update_last_active_time
 from app.schemas.schemas import (
     TaskCreate, TaskUpdate, TaskResponse,
     CommentCreate, CommentResponse, AttachmentResponse
@@ -134,6 +135,7 @@ def create_task(data: TaskCreate, db: Session = Depends(get_db), current_user: U
     )
     db.add(task)
     db.commit()
+    _update_last_active_time(db, current_user)
     db.refresh(task)
     return build_task_response(task)
 
@@ -183,8 +185,9 @@ def update_task(task_id: int, data: TaskUpdate, db: Session = Depends(get_db), c
     
     for key, value in update_data.items():
         setattr(task, key, value)
-    
+
     db.commit()
+    _update_last_active_time(db, current_user)
     db.refresh(task)
     return build_task_response(task)
 
@@ -196,6 +199,7 @@ def delete_task(task_id: int, db: Session = Depends(get_db), current_user: User 
         raise HTTPException(status_code=404, detail="任务不存在")
     db.delete(task)
     db.commit()
+    _update_last_active_time(db, current_user)
     return {"ok": True}
 
 

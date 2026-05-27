@@ -20,20 +20,6 @@
         <el-button size="small" @click="execCmd('blockquote')" :type="isActive('blockquote') ? 'primary' : 'default'">引用</el-button>
         <el-divider direction="vertical" />
         <el-button size="small" @click="setLink">链接</el-button>
-        <div v-if="members.length" class="toolbar-colors">
-          <button
-            v-for="member in members"
-            :key="member.id"
-            type="button"
-            class="toolbar-color-chip"
-            :style="{ background: member.color || '#93c5fd' }"
-            :title="member.display_name || member.username"
-            @click="applyMemberHighlight(member)"
-          >
-            {{ (member.display_name || member.username || '').slice(0, 2) }}
-          </button>
-        </div>
-        <el-button size="small" @click="clearHighlight">清除标记</el-button>
         <el-button size="small" @click="undo">撤销</el-button>
         <el-button size="small" @click="redo">重做</el-button>
       </div>
@@ -92,7 +78,6 @@ const auth = useAuthStore()
 const loading = ref(true)
 const doc = ref(null)
 const editor = ref(null)
-const members = ref([])
 const saveStatusText = ref('已保存')
 let autoSaveTimer = null
 
@@ -112,13 +97,11 @@ onMounted(async () => {
   }
 
   try {
-    const [me, currentDoc, memberList] = await Promise.all([
+    const [me, currentDoc] = await Promise.all([
       auth.getMe(),
       api.get(`/documents/${id}`),
-      api.get('/auth/users')
     ])
     doc.value = currentDoc
-    members.value = memberList || []
     initEditor(doc.value?.content || '')
   } catch (error) {
     console.error(error)
@@ -196,15 +179,6 @@ function isActive(name, attrs) {
   return editor.value?.isActive(name, attrs) || false
 }
 
-function applyMemberHighlight(member) {
-  if (!editor.value) return
-  editor.value.chain().focus().toggleHighlight({ color: member.color || '#93c5fd' }).run()
-}
-
-function clearHighlight() {
-  editor.value?.chain().focus().unsetHighlight().run()
-}
-
 function setLink() {
   linkUrl.value = editor.value?.getAttributes('link')?.href || ''
   linkDialog.value = true
@@ -271,23 +245,6 @@ async function deleteDoc() {
   color: #0f172a;
   font-size: 12px;
   font-weight: 600;
-}
-
-.toolbar-colors {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.toolbar-color-chip {
-  border: none;
-  border-radius: 999px;
-  padding: 6px 10px;
-  color: #0f172a;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
 }
 
 .tiptap-editor :deep(.editor-prosemirror) {

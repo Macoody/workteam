@@ -8,7 +8,7 @@ from datetime import datetime, date
 from app.core.database import get_db
 from app.models.models import User, WorkLog
 from app.schemas.schemas import WorkLogCreate, WorkLogUpdate, WorkLogResponse
-from app.routers.auth import get_current_user
+from app.routers.auth import get_current_user, _update_last_active_time
 
 router = APIRouter()
 
@@ -43,6 +43,7 @@ def create_log(data: WorkLogCreate, db: Session = Depends(get_db), current_user:
         existing.content = data.content
         existing.log_date = data.log_date
         db.commit()
+        _update_last_active_time(db, current_user)
         db.refresh(existing)
         return existing
 
@@ -53,6 +54,7 @@ def create_log(data: WorkLogCreate, db: Session = Depends(get_db), current_user:
     )
     db.add(log)
     db.commit()
+    _update_last_active_time(db, current_user)
     db.refresh(log)
     return log
 

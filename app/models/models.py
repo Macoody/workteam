@@ -27,6 +27,8 @@ class User(Base):
     avatar = Column(String(500))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     is_active = Column(Boolean, default=True)
+    last_visit_time = Column(DateTime(timezone=True), nullable=True)
+    last_active_time = Column(DateTime(timezone=True), nullable=True)
 
 
 class Project(Base):

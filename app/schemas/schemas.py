@@ -46,6 +46,8 @@ class UserResponse(BaseModel):
     avatar: Optional[str]
     is_active: bool
     created_at: Optional[datetime]
+    last_visit_time: Optional[datetime]
+    last_active_time: Optional[datetime]
 
     class Config:
         from_attributes = True

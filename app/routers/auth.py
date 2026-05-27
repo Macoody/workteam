@@ -21,6 +21,13 @@ router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
+def _update_last_active_time(db: Session, user: User):
+    """更新用户最后活跃时间"""
+    now = datetime.utcnow()
+    user.last_active_time = now
+    db.commit()
+
+
 def _clean_optional(value: str | None):
     if value is None:
         return None
@@ -103,6 +110,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     user = db.query(User).filter(User.id == int(user_id)).first()
     if user is None or not user.is_active:
         raise credentials_exception
+    # 更新 last_visit_time（最多每 60 秒一次，避免频繁写库）
+    now = datetime.utcnow()
+    if user.last_visit_time is None or (now - user.last_visit_time.replace(tzinfo=None)).total_seconds() > 60:
+        user.last_visit_time = now
+        db.commit()
     return user
 
 
@@ -166,7 +178,12 @@ def login(data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账户已被禁用")
-    
+
+    now = datetime.utcnow()
+    user.last_visit_time = now
+    user.last_active_time = now
+    db.commit()
+
     access_token = create_access_token(data={"sub": str(user.id)})
     return TokenResponse(
         access_token=access_token,

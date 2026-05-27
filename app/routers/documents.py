@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.models import User, Document, Folder, FileAsset, UserRole
 from app.schemas.schemas import DocumentCreate, DocumentUpdate, DocumentResponse, FolderCreate, FolderResponse, FileAssetResponse
-from app.routers.auth import get_current_user, require_admin
+from app.routers.auth import get_current_user, require_admin, _update_last_active_time
 
 router = APIRouter()
 UPLOAD_DIR = os.path.join(settings.UPLOAD_DIR, "documents")
@@ -50,6 +50,7 @@ def create_document(data: DocumentCreate, db: Session = Depends(get_db), current
     )
     db.add(doc)
     db.commit()
+    _update_last_active_time(db, current_user)
     db.refresh(doc)
     return doc
 
@@ -69,13 +70,14 @@ def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在")
-
+    # 所有人可编辑任意文档（管理员可编辑全部）
     if data.title is not None:
         doc.title = data.title
     if data.content is not None:
         doc.content = data.content
         doc.last_editor_id = current_user.id
     db.commit()
+    _update_last_active_time(db, current_user)
     db.refresh(doc)
     return doc
 
@@ -89,6 +91,7 @@ def delete_document(doc_id: int, db: Session = Depends(get_db), current_user: Us
         raise HTTPException(status_code=403, detail="无删除权限")
     db.delete(doc)
     db.commit()
+    _update_last_active_time(db, current_user)
     return {"ok": True}
 
 
@@ -98,7 +101,7 @@ def share_document(doc_id: int, mode: str = "readonly", expire_hours: int = 72, 
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在")
-    if doc.creator_id != current_user.id and current_user.role != UserRole.ADMIN:
+    if doc.creator_id != current_user.id and current_user.role.value != "admin":
         raise HTTPException(status_code=403, detail="无分享权限")
     
     import secrets
