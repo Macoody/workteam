@@ -241,7 +241,7 @@ def complete_task(task_id: int, db: Session = Depends(get_db), current_user: Use
         completed_by.append(current_user.username)
     task.completed_by = json.dumps(completed_by)
 
-    target_name = "已完成" if current_user.username == "mac" else "待验收"
+    target_name = "已完成" if current_user.role == UserRole.ADMIN else "待验收"
     target_column = resolve_target_column(db, task.project_id, target_name)
     if not target_column:
         raise HTTPException(status_code=400, detail=f"项目中缺少“{target_name}”列")

@@ -300,7 +300,7 @@ async function completeTask() {
     const updated = await api.post(`/tasks/${currentTask.value.id}/complete`)
     currentTask.value = updated
     taskDrawer.value = false
-    ElMessage.success(auth.user?.username === 'mac' ? '任务已归档到已完成' : '任务已移入待验收')
+    ElMessage.success(auth.user?.role === 'admin' ? '任务已归档到已完成' : '任务已移入待验收')
     await loadKanban()
   } catch (error) {
     ElMessage.error(error?.response?.data?.detail || '操作失败')

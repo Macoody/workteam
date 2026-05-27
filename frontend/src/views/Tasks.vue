@@ -257,7 +257,7 @@ async function completeTask() {
   completing.value = true
   try {
     await api.post(`/tasks/${currentTask.value.id}/complete`)
-    ElMessage.success(auth.user?.username === 'mac' ? '任务已归档到已完成' : '任务已移入待验收')
+    ElMessage.success(auth.user?.role === 'admin' ? '任务已归档到已完成' : '任务已移入待验收')
     editDialog.value = false
     await loadTasks()
   } catch (error) {

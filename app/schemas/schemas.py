@@ -77,6 +77,10 @@ class ProjectResponse(BaseModel):
     owner_id: int
     created_at: Optional[datetime]
     task_count: Optional[int] = 0
+    pending_count: Optional[int] = 0
+    in_progress_count: Optional[int] = 0
+    review_count: Optional[int] = 0
+    done_count: Optional[int] = 0
 
     class Config:
         from_attributes = True

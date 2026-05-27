@@ -31,9 +31,21 @@
         <div style="margin-top: 18px" class="item-title">{{ project.name }}</div>
         <div class="item-meta">{{ project.description || '暂无项目说明' }}</div>
 
+        <div class="project-stats">
+          <div
+            v-for="item in projectStatusItems(project)"
+            :key="item.label"
+            class="project-stat-item"
+            :style="{ background: item.tint, color: item.color, boxShadow: `inset 0 0 0 1px ${item.ring}` }"
+          >
+            <div class="project-stat-label">{{ item.label }}</div>
+            <div class="project-stat-value">{{ item.value }}</div>
+          </div>
+        </div>
+
         <div style="margin-top: 18px; display: flex; justify-content: space-between; align-items: center">
           <span class="muted">创建于 {{ formatDate(project.created_at) }}</span>
-          <el-tag effect="light">{{ project.task_count || 0 }} 列</el-tag>
+          <el-tag effect="light">{{ project.task_count || 0 }} 个任务</el-tag>
         </div>
       </div>
     </div>
@@ -71,8 +83,14 @@ const saving = ref(false)
 const editingProjectId = ref(null)
 const form = reactive({ name: '', description: '' })
 const projects = ref([])
+const statusPalette = [
+  { label: '待处理', key: 'pending_count', color: '#64748b', tint: 'rgba(148, 163, 184, 0.16)', ring: 'rgba(148, 163, 184, 0.28)' },
+  { label: '进行中', key: 'in_progress_count', color: '#2563eb', tint: 'rgba(59, 130, 246, 0.14)', ring: 'rgba(59, 130, 246, 0.24)' },
+  { label: '待验收', key: 'review_count', color: '#d97706', tint: 'rgba(245, 158, 11, 0.16)', ring: 'rgba(245, 158, 11, 0.26)' },
+  { label: '已完成', key: 'done_count', color: '#059669', tint: 'rgba(16, 185, 129, 0.14)', ring: 'rgba(16, 185, 129, 0.24)' }
+]
 
-const canDeleteProject = computed(() => auth.user?.username === 'mac')
+const canDeleteProject = computed(() => auth.user?.role === 'admin')
 
 onMounted(async () => {
   await auth.getMe()
@@ -143,7 +161,41 @@ function goToKanban(projectId) {
   router.push(`/kanban?project=${projectId}`)
 }
 
+function projectStatusItems(project) {
+  return statusPalette.map(item => ({
+    ...item,
+    value: project?.[item.key] || 0
+  }))
+}
+
 function formatDate(value) {
   return value ? dayjs(value).format('YYYY-MM-DD') : '--'
 }
 </script>
+
+<style scoped>
+.project-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.project-stat-item {
+  border-radius: 16px;
+  padding: 12px 10px;
+}
+
+.project-stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.project-stat-value {
+  margin-top: 8px;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+}
+</style>

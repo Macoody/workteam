@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.core.database import get_db
-from app.models.models import User, Project, TaskColumn, UserRole
+from app.models.models import User, Project, TaskColumn, Task, UserRole
 from app.schemas.schemas import ProjectCreate, ProjectUpdate, ProjectResponse
 from app.routers.auth import get_current_user
 
@@ -33,9 +33,27 @@ def list_projects(db: Session = Depends(get_db), current_user: User = Depends(ge
     projects = db.query(Project).all()
     result = []
     for p in projects:
-        task_count = db.query(TaskColumn).filter(TaskColumn.project_id == p.id).count()
+        columns = db.query(TaskColumn).filter(TaskColumn.project_id == p.id).all()
+        column_ids = [column.id for column in columns]
+        column_name_by_id = {column.id: column.name for column in columns}
+        status_counts = {
+            "待处理": 0,
+            "进行中": 0,
+            "待验收": 0,
+            "已完成": 0,
+        }
+        if column_ids:
+            tasks = db.query(Task).filter(Task.column_id.in_(column_ids)).all()
+            for task in tasks:
+                column_name = column_name_by_id.get(task.column_id)
+                if column_name in status_counts:
+                    status_counts[column_name] += 1
         r = ProjectResponse.model_validate(p)
-        r.task_count = task_count
+        r.task_count = sum(status_counts.values())
+        r.pending_count = status_counts["待处理"]
+        r.in_progress_count = status_counts["进行中"]
+        r.review_count = status_counts["待验收"]
+        r.done_count = status_counts["已完成"]
         result.append(r)
     return result
 
@@ -90,8 +108,8 @@ def delete_project(project_id: int, db: Session = Depends(get_db), current_user:
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
-    if current_user.username != "mac":
-        raise HTTPException(status_code=403, detail="只有 mac 用户可以删除项目")
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="只有管理员可以删除项目")
     db.delete(project)
     db.commit()
     return {"ok": True}
