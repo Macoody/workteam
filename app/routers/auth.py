@@ -114,9 +114,21 @@ def require_admin(current_user: User = Depends(get_current_user)):
 
 @router.post("/register", response_model=TokenResponse)
 def register(data: UserCreate, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.username == data.username, User.is_active == True).first():
-        raise HTTPException(status_code=400, detail="用户名已存在")
-    
+    existing = db.query(User).filter(User.username == data.username).first()
+    if existing:
+        if existing.is_active:
+            raise HTTPException(status_code=400, detail="用户名已存在")
+        # 被删掉的账号：重置密码+重新激活
+        existing.password_hash = get_password_hash(data.password)
+        existing.is_active = True
+        existing.phone = data.phone
+        db.commit()
+        db.refresh(existing)
+        access_token = create_access_token(data={"sub": str(existing.id)})
+        return TokenResponse(
+            access_token=access_token,
+            user=UserResponse.model_validate(existing)
+        )
     user = User(
         username=data.username,
         password_hash=get_password_hash(data.password),
