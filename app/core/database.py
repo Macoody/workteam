@@ -42,6 +42,21 @@ def ensure_runtime_schema():
             with engine.begin() as connection:
                 for statement in statements:
                     connection.execute(text(statement))
+    if not inspector.has_table("comment_mentions"):
+        with engine.begin() as connection:
+            connection.execute(text("""
+                CREATE TABLE comment_mentions (
+                    id INTEGER PRIMARY KEY,
+                    comment_id INTEGER NOT NULL,
+                    task_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    is_read BOOLEAN DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(comment_id) REFERENCES comments (id) ON DELETE CASCADE,
+                    FOREIGN KEY(task_id) REFERENCES tasks (id) ON DELETE CASCADE,
+                    FOREIGN KEY(user_id) REFERENCES users (id)
+                )
+            """))
 
 
 def get_db():

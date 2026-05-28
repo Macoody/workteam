@@ -198,6 +198,19 @@ class CommentResponse(BaseModel):
         from_attributes = True
 
 
+class MentionNotificationResponse(BaseModel):
+    id: int
+    comment_id: int
+    task_id: int
+    project_id: int
+    task_title: str
+    project_name: Optional[str] = None
+    comment_content: str
+    mentioned_by: Optional[UserResponse] = None
+    created_at: Optional[datetime]
+    is_read: bool
+
+
 # === 文档 ===
 class DocumentCreate(BaseModel):
     title: str

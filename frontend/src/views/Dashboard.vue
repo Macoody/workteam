@@ -62,6 +62,30 @@
           </div>
         </div>
       </section>
+
+      <section class="panel">
+        <h3 class="section-title">@我的提醒</h3>
+        <div v-if="mentionNotifications.length === 0" class="empty-card">暂时没有新的 @ 提醒。</div>
+        <div v-else class="simple-list">
+          <button
+            v-for="item in unreadMentionNotifications"
+            :key="item.id"
+            type="button"
+            class="mention-card"
+            @click="openMention(item)"
+          >
+            <div class="item-main">
+              <div class="item-title">
+                {{ item.mentioned_by?.display_name || item.mentioned_by?.username || '成员' }}
+                @了你
+              </div>
+              <div class="item-meta">{{ item.project_name || resolveProjectName(item.project_id) }} · {{ item.task_title }}</div>
+              <div class="mention-preview">{{ item.comment_content }}</div>
+            </div>
+            <span class="mention-time">{{ formatDate(item.created_at) }}</span>
+          </button>
+        </div>
+      </section>
     </div>
   </AppShell>
 </template>
@@ -70,15 +94,18 @@
 import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
 import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
 
+const router = useRouter()
 const auth = useAuthStore()
 const stats = ref({ projects: 0, tasks: 0, myTasks: 0, documents: 0 })
 const recentTasks = ref([])
 const projects = ref([])
 const users = ref([])
 const columnsById = ref({})
+const mentionNotifications = ref([])
 
 const statCards = computed(() => [
   { label: '项目总数', value: stats.value.projects, footnote: '已创建的协作空间' },
@@ -86,19 +113,22 @@ const statCards = computed(() => [
   { label: '我的任务', value: stats.value.myTasks, footnote: '待继续推进的事项' },
   { label: '文档数量', value: stats.value.documents, footnote: '沉淀中的知识资料' }
 ])
+const unreadMentionNotifications = computed(() => mentionNotifications.value.filter(item => !item.is_read))
 
 onMounted(async () => {
   await auth.getMe()
   try {
-    const [projectList, taskList, myTasks, docs, userList] = await Promise.all([
+    const [projectList, taskList, myTasks, docs, userList, mentions] = await Promise.all([
       api.get('/projects'),
       api.get('/tasks'),
       api.get('/tasks?my_tasks=true'),
       api.get('/documents'),
-      api.get('/auth/users')
+      api.get('/auth/users'),
+      api.get('/tasks/comment-mentions/me')
     ])
     projects.value = projectList || []
     users.value = userList || []
+    mentionNotifications.value = mentions || []
     const kanbanResults = await Promise.allSettled(
       (projectList || []).map(project => api.get(`/kanban/project/${project.id}`))
     )
@@ -157,6 +187,18 @@ function latestDeliveryDate(task) {
 function formatDate(value) {
   return dayjs(value).format('MM-DD HH:mm')
 }
+
+async function openMention(item) {
+  try {
+    if (!item.is_read) {
+      await api.post(`/tasks/comment-mentions/${item.id}/read`)
+      item.is_read = true
+    }
+  } catch (error) {
+    console.error(error)
+  }
+  router.push(`/kanban?project=${item.project_id}&task=${item.task_id}`)
+}
 </script>
 
 <style scoped>
@@ -185,6 +227,32 @@ function formatDate(value) {
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
+  white-space: nowrap;
+}
+
+.mention-card {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mention-preview {
+  margin-top: 6px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.mention-time {
+  color: #64748b;
+  font-size: 12px;
   white-space: nowrap;
 }
 </style>

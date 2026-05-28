@@ -117,7 +117,13 @@
           <span class="muted">{{ formatDate(comment.created_at) }}</span>
         </div>
       </div>
-      <el-input v-model="commentText" type="textarea" :rows="3" placeholder="添加评论" style="margin-top: 12px" />
+      <el-input
+        v-model="commentText"
+        type="textarea"
+        :rows="3"
+        placeholder="添加评论，可用 @用户名 或 @显示名 提醒成员"
+        style="margin-top: 12px"
+      />
       <el-button type="primary" size="small" style="margin-top: 8px" @click="addComment">发送</el-button>
     </el-drawer>
 
@@ -222,6 +228,7 @@ onMounted(async () => {
 
   if (selectedProject.value) {
     await loadKanban()
+    await openTaskFromQuery()
   }
 })
 
@@ -240,6 +247,7 @@ async function loadKanban() {
     ])
     columns.value = columnList || []
     projectDocuments.value = documentList || []
+    await openTaskFromQuery()
   } catch (error) {
     console.error(error)
     ElMessage.error('看板加载失败')
@@ -259,6 +267,15 @@ async function openTask(task) {
   showExtensionPicker.value = false
   comments.value = await api.get(`/tasks/${task.id}/comments`)
   taskDrawer.value = true
+}
+
+async function openTaskFromQuery() {
+  const taskId = Number(route.query.task)
+  if (!taskId) return
+  const targetTask = columns.value.flatMap(column => column.tasks || []).find(task => task.id === taskId)
+  if (!targetTask) return
+  if (currentTask.value?.id === targetTask.id && taskDrawer.value) return
+  await openTask(targetTask)
 }
 
 async function saveTask() {

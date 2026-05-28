@@ -6,15 +6,16 @@ from sqlalchemy.orm import Session
 import os
 import uuid
 import json
+import re
 from datetime import datetime
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.models import User, Task, TaskColumn, Attachment, Comment, UserRole, Document
+from app.models.models import User, Task, TaskColumn, Attachment, Comment, CommentMention, UserRole, Document, Project
 from app.routers.auth import _update_last_active_time
 from app.schemas.schemas import (
     TaskCreate, TaskUpdate, TaskResponse,
-    CommentCreate, CommentResponse, AttachmentResponse
+    CommentCreate, CommentResponse, AttachmentResponse, MentionNotificationResponse
 )
 from app.routers.auth import get_current_user
 
@@ -91,6 +92,35 @@ def resolve_target_column(db: Session, project_id: int, column_name: str):
         TaskColumn.project_id == project_id,
         TaskColumn.name == column_name
     ).first()
+
+
+def extract_mentioned_users(db: Session, content: str, author_id: int):
+    tokens = {token.strip() for token in re.findall(r'@([^\s@，,。；;：:\n]+)', content or '') if token.strip()}
+    if not tokens:
+        return []
+    users = db.query(User).filter(User.is_active == True, User.id != author_id).all()
+    matched = []
+    for user in users:
+        if user.username in tokens or (user.display_name and user.display_name in tokens):
+            matched.append(user)
+    return matched
+
+
+def build_mention_notification(mention: CommentMention):
+    task = mention.task
+    project = task.project if task else None
+    return MentionNotificationResponse(
+        id=mention.id,
+        comment_id=mention.comment_id,
+        task_id=mention.task_id,
+        project_id=task.project_id if task else 0,
+        task_title=task.title if task else "任务",
+        project_name=project.name if project else None,
+        comment_content=mention.comment.content if mention.comment else "",
+        mentioned_by=mention.comment.user if mention.comment else None,
+        created_at=mention.created_at,
+        is_read=bool(mention.is_read),
+    )
 
 
 @router.get("", response_model=list[TaskResponse])
@@ -340,6 +370,27 @@ def list_comments(task_id: int, db: Session = Depends(get_db), current_user: Use
     return result
 
 
+@router.get("/comment-mentions/me", response_model=list[MentionNotificationResponse])
+def list_my_mentions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    mentions = db.query(CommentMention).filter(
+        CommentMention.user_id == current_user.id
+    ).order_by(CommentMention.created_at.desc()).limit(30).all()
+    return [build_mention_notification(mention) for mention in mentions]
+
+
+@router.post("/comment-mentions/{mention_id}/read")
+def mark_mention_read(mention_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    mention = db.query(CommentMention).filter(
+        CommentMention.id == mention_id,
+        CommentMention.user_id == current_user.id
+    ).first()
+    if not mention:
+        raise HTTPException(status_code=404, detail="提醒不存在")
+    mention.is_read = True
+    db.commit()
+    return {"ok": True}
+
+
 @router.post("/{task_id}/comments", response_model=CommentResponse)
 def create_comment(task_id: int, data: CommentCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     task = db.query(Task).filter(Task.id == task_id).first()
@@ -354,6 +405,17 @@ def create_comment(task_id: int, data: CommentCreate, db: Session = Depends(get_
     db.add(comment)
     db.commit()
     db.refresh(comment)
+
+    mentioned_users = extract_mentioned_users(db, data.content, current_user.id)
+    for user in mentioned_users:
+        db.add(CommentMention(
+            comment_id=comment.id,
+            task_id=task_id,
+            user_id=user.id,
+            is_read=False,
+        ))
+    if mentioned_users:
+        db.commit()
     
     r = CommentResponse.model_validate(comment)
     r.user = current_user

@@ -117,6 +117,21 @@ class Comment(Base):
     user = relationship("User")
 
 
+class CommentMention(Base):
+    __tablename__ = "comment_mentions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    comment_id = Column(Integer, ForeignKey("comments.id", ondelete="CASCADE"), nullable=False)
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    comment = relationship("Comment")
+    task = relationship("Task")
+    user = relationship("User")
+
+
 class Document(Base):
     __tablename__ = "documents"
 
