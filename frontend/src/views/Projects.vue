@@ -74,6 +74,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
 import AppShell from '@/components/AppShell.vue'
+import api from '@/api'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -83,6 +84,7 @@ const saving = ref(false)
 const editingProjectId = ref(null)
 const form = reactive({ name: '', description: '' })
 const projects = ref([])
+const projectStatsById = ref({})
 const statusPalette = [
   { label: '待处理', key: 'pending_count', color: '#64748b', tint: 'rgba(148, 163, 184, 0.16)', ring: 'rgba(148, 163, 184, 0.28)' },
   { label: '进行中', key: 'in_progress_count', color: '#2563eb', tint: 'rgba(59, 130, 246, 0.14)', ring: 'rgba(59, 130, 246, 0.24)' },
@@ -98,7 +100,30 @@ onMounted(async () => {
 })
 
 async function refreshProjects() {
-  projects.value = await projectStore.fetchProjects()
+  const projectList = await projectStore.fetchProjects()
+  const statsEntries = await Promise.all(
+    (projectList || []).map(async project => {
+      const columns = await api.get(`/kanban/project/${project.id}`)
+      const stats = {
+        pending_count: 0,
+        in_progress_count: 0,
+        review_count: 0,
+        done_count: 0,
+        task_count: 0
+      }
+      ;(columns || []).forEach(column => {
+        const count = column.tasks?.length || 0
+        stats.task_count += count
+        if (column.name === '待处理') stats.pending_count = count
+        if (column.name === '进行中') stats.in_progress_count = count
+        if (column.name === '待验收') stats.review_count = count
+        if (column.name === '已完成') stats.done_count = count
+      })
+      return [project.id, stats]
+    })
+  )
+  projectStatsById.value = Object.fromEntries(statsEntries)
+  projects.value = projectList
 }
 
 function openCreate() {
@@ -162,9 +187,10 @@ function goToKanban(projectId) {
 }
 
 function projectStatusItems(project) {
+  const stats = projectStatsById.value[project.id] || {}
   return statusPalette.map(item => ({
     ...item,
-    value: project?.[item.key] || 0
+    value: stats[item.key] ?? project?.[item.key] ?? 0
   }))
 }
 

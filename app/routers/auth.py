@@ -201,7 +201,7 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 @router.get("/users", response_model=list[UserResponse])
 def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return db.query(User).filter(User.is_active == True).order_by(User.created_at.desc()).all()
+    return db.query(User).filter(User.is_active.is_(True)).order_by(User.created_at.desc()).all()
 
 
 @router.post("/users", response_model=UserResponse)
@@ -235,9 +235,11 @@ def create_user(data: UserManageCreate, db: Session = Depends(get_db), current_u
 
 @router.put("/users/{user_id}", response_model=UserResponse)
 def update_user(user_id: int, data: UserManageUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
-    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
+    if not user.is_active:
+        raise HTTPException(status_code=404, detail="用户已停用")
 
     phone = _clean_optional(data.phone)
     color = _clean_color(data.color) if data.color is not None else None
@@ -269,9 +271,11 @@ def update_user(user_id: int, data: UserManageUpdate, db: Session = Depends(get_
 
 @router.delete("/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
-    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
+    if not user.is_active:
+        raise HTTPException(status_code=404, detail="用户已停用")
     if user.id == current_user.id:
         raise HTTPException(status_code=400, detail="不能删除当前登录账号")
 

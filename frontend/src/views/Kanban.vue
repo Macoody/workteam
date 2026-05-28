@@ -44,6 +44,14 @@
               </div>
               <div v-if="task.description" class="task-card-note">{{ task.description }}</div>
               <div v-if="task.linked_document_id" class="task-card-link">已关联文档</div>
+              <div v-if="task.recent_comments?.length" class="task-comment-stack">
+                <div v-for="comment in task.recent_comments" :key="comment.id" class="task-comment-chip">
+                  <span class="task-comment-author">
+                    {{ comment.user?.display_name || comment.user?.username || '成员' }}
+                  </span>
+                  <span class="task-comment-text">{{ comment.content }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -208,7 +216,7 @@ const creating = ref(false)
 
 const deliveryTimeline = computed(() => currentTask.value?.delivery_dates || [])
 const currentProject = computed(() => projects.value.find(item => item.id === selectedProject.value) || null)
-const canClaimTask = computed(() => currentTask.value && currentTask.value.column_id === getPendingColumnId())
+const canClaimTask = computed(() => resolveTaskStatus(currentTask.value) === '待处理')
 
 onMounted(async () => {
   await auth.getMe()
@@ -262,7 +270,7 @@ async function openTask(task) {
   editForm.node_output = task.node_output || ''
   editForm.linked_document_id = task.linked_document_id || null
   editForm.assignee_id = task.assignee_id
-  editForm.due_date = task.due_date
+  editForm.due_date = task.due_date ? new Date(task.due_date) : null
   extensionDate.value = null
   showExtensionPicker.value = false
   comments.value = await api.get(`/tasks/${task.id}/comments`)
@@ -281,8 +289,16 @@ async function openTaskFromQuery() {
 async function saveTask() {
   saving.value = true
   try {
-    const updated = await api.put(`/tasks/${currentTask.value.id}`, editForm)
+    const payload = {
+      description: editForm.description,
+      node_output: editForm.node_output,
+      linked_document_id: editForm.linked_document_id,
+      assignee_id: editForm.assignee_id,
+      due_date: editForm.due_date ? dayjs(editForm.due_date).toISOString() : null
+    }
+    const updated = await api.put(`/tasks/${currentTask.value.id}`, payload)
     currentTask.value = updated
+    editForm.due_date = updated.due_date ? new Date(updated.due_date) : null
     ElMessage.success('保存成功')
     await loadKanban()
   } catch (error) {
@@ -378,6 +394,7 @@ async function createTask() {
   try {
     await api.post('/tasks', {
       ...newTask,
+      due_date: newTask.due_date ? dayjs(newTask.due_date).toISOString() : null,
       column_id: pendingColumnId,
       project_id: selectedProject.value
     })
@@ -392,11 +409,17 @@ async function createTask() {
 }
 
 async function claimTask() {
+  const taskId = Number(currentTask.value?.id)
+  if (!taskId) {
+    ElMessage.error('当前任务信息不完整，无法领取')
+    return
+  }
   claiming.value = true
   try {
-    const updated = await api.post(`/tasks/${currentTask.value.id}/claim`)
+    const updated = await api.post(`/tasks/${taskId}/claim`)
     currentTask.value = updated
     editForm.assignee_id = updated.assignee_id
+    editForm.due_date = updated.due_date ? new Date(updated.due_date) : null
     ElMessage.success('任务已领取，已移入进行中')
     await loadKanban()
   } catch (error) {
@@ -408,6 +431,11 @@ async function claimTask() {
 
 function resolveUser(userId) {
   return users.value.find(item => item.id === userId) || null
+}
+
+function resolveTaskStatus(task) {
+  if (!task) return ''
+  return columns.value.find(item => item.id === task.column_id)?.name || ''
 }
 
 function getPendingColumnId() {
@@ -489,6 +517,34 @@ function formatDate(value) {
   color: #2563eb;
   font-size: 12px;
   font-weight: 600;
+}
+
+.task-comment-stack {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.task-comment-chip {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.task-comment-author {
+  flex: 0 0 auto;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.task-comment-text {
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .delivery-stack {

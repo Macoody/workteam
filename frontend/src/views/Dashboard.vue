@@ -13,7 +13,13 @@
         <h3 class="section-title">近期任务</h3>
         <div v-if="recentTasks.length === 0" class="empty-card">还没有任务，先从项目看板里创建第一条任务。</div>
         <div v-else class="simple-list">
-          <div v-for="task in recentTasks" :key="task.id" class="simple-list-item">
+          <button
+            v-for="task in recentTasks"
+            :key="task.id"
+            type="button"
+            class="simple-list-item task-jump-card"
+            @click="openTask(task)"
+          >
             <span class="status-pill" :style="statusPillStyle(task)">
               {{ resolveTaskStatus(task) }}
             </span>
@@ -31,8 +37,16 @@
                 </span>
                 <span v-if="latestDeliveryDate(task)"> · 交付 {{ formatDate(latestDeliveryDate(task)) }}</span>
               </div>
+              <div v-if="task.recent_comments?.length" class="task-comment-stack">
+                <div v-for="comment in task.recent_comments" :key="comment.id" class="task-comment-chip">
+                  <span class="task-comment-author">
+                    {{ comment.user?.display_name || comment.user?.username || '成员' }}
+                  </span>
+                  <span class="task-comment-text">{{ comment.content }}</span>
+                </div>
+              </div>
             </div>
-          </div>
+          </button>
         </div>
       </section>
 
@@ -199,9 +213,21 @@ async function openMention(item) {
   }
   router.push(`/kanban?project=${item.project_id}&task=${item.task_id}`)
 }
+
+function openTask(task) {
+  router.push(`/kanban?project=${task.project_id}&task=${task.id}`)
+}
 </script>
 
 <style scoped>
+.task-jump-card {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
 .meta-separator {
   margin: 0 6px;
 }
@@ -228,6 +254,34 @@ async function openMention(item) {
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
+}
+
+.task-comment-stack {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.task-comment-chip {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.task-comment-author {
+  flex: 0 0 auto;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.task-comment-text {
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .mention-card {

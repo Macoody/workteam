@@ -162,6 +162,7 @@ class TaskResponse(BaseModel):
     order: int
     created_at: Optional[datetime]
     attachments: List["AttachmentResponse"] = []
+    recent_comments: List["CommentResponse"] = []
 
     class Config:
         from_attributes = True

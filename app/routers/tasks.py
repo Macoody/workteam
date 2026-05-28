@@ -67,6 +67,12 @@ def validate_linked_document(db: Session, project_id: int, document_id: int | No
 
 
 def build_task_response(task: Task):
+    recent_comments = []
+    comments = sorted(task.comments or [], key=lambda item: item.created_at or datetime.min, reverse=True)[:2]
+    for comment in comments:
+        item = CommentResponse.model_validate(comment)
+        item.user = comment.user
+        recent_comments.append(item)
     return TaskResponse(
         id=task.id,
         project_id=task.project_id,
@@ -84,6 +90,7 @@ def build_task_response(task: Task):
         order=task.order,
         created_at=task.created_at,
         attachments=task.attachments or [],
+        recent_comments=recent_comments,
     )
 
 
@@ -287,6 +294,10 @@ def claim_task(task_id: int, db: Session = Depends(get_db), current_user: User =
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
+
+    current_column = db.query(TaskColumn).filter(TaskColumn.id == task.column_id).first()
+    if not current_column or current_column.name != "待处理":
+        raise HTTPException(status_code=400, detail="只有待处理状态的任务可以领取")
 
     target_column = resolve_target_column(db, task.project_id, "进行中")
     if not target_column:

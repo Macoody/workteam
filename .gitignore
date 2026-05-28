@@ -3,3 +3,5 @@ dist/
 .DS_Store
 *.log
 .envnode_modules/
+__pycache__/
+*.pyc

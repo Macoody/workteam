@@ -9,7 +9,21 @@
 
     <div class="panel table-panel">
       <el-table :data="tasks" style="width: 100%" v-loading="loading">
-        <el-table-column prop="title" label="标题" min-width="220" />
+        <el-table-column label="标题" min-width="320">
+          <template #default="{ row }">
+            <div class="task-list-cell">
+              <div class="task-list-title">{{ row.title }}</div>
+              <div v-if="row.recent_comments?.length" class="task-comment-stack">
+                <div v-for="comment in row.recent_comments" :key="comment.id" class="task-comment-chip">
+                  <span class="task-comment-author">
+                    {{ comment.user?.display_name || comment.user?.username || '成员' }}
+                  </span>
+                  <span class="task-comment-text">{{ comment.content }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="负责人" width="160">
           <template #default="{ row }">
             <span v-if="resolveUser(row.assignee_id)" class="user-chip" :style="{ background: resolveUser(row.assignee_id).color || '#93c5fd' }">
@@ -167,7 +181,7 @@ async function openEdit(task) {
   editForm.node_output = task.node_output || ''
   editForm.linked_document_id = task.linked_document_id || null
   editForm.assignee_id = task.assignee_id
-  editForm.due_date = task.due_date
+  editForm.due_date = task.due_date ? new Date(task.due_date) : null
   extensionDate.value = null
   showExtensionPicker.value = false
   await Promise.all([
@@ -220,8 +234,19 @@ async function saveTask() {
 
   saving.value = true
   try {
-    const updated = await api.put(`/tasks/${currentTask.value.id}`, editForm)
+    const payload = {
+      project_id: editForm.project_id,
+      column_id: editForm.column_id,
+      title: editForm.title,
+      description: editForm.description,
+      node_output: editForm.node_output,
+      linked_document_id: editForm.linked_document_id,
+      assignee_id: editForm.assignee_id,
+      due_date: editForm.due_date ? dayjs(editForm.due_date).toISOString() : null
+    }
+    const updated = await api.put(`/tasks/${currentTask.value.id}`, payload)
     currentTask.value = updated
+    editForm.due_date = updated.due_date ? new Date(updated.due_date) : null
     ElMessage.success('保存成功')
     editDialog.value = false
     await loadTasks()
@@ -288,6 +313,16 @@ function formatDate(value) {
 </script>
 
 <style scoped>
+.task-list-cell {
+  display: grid;
+  gap: 8px;
+}
+
+.task-list-title {
+  color: #0f172a;
+  font-weight: 700;
+}
+
 .user-chip {
   display: inline-flex;
   align-items: center;
@@ -296,6 +331,33 @@ function formatDate(value) {
   color: #0f172a;
   font-size: 12px;
   font-weight: 600;
+}
+
+.task-comment-stack {
+  display: grid;
+  gap: 6px;
+}
+
+.task-comment-chip {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.task-comment-author {
+  flex: 0 0 auto;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.task-comment-text {
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .delivery-stack {
