@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.core.database import get_db
-from app.models.models import User, Project, TaskColumn, UserRole
+from app.models.models import User, Project, TaskColumn, Task, UserRole
 from app.schemas.schemas import ProjectCreate, ProjectUpdate, ProjectResponse
 from app.routers.auth import get_current_user, require_admin
 
@@ -33,7 +33,7 @@ def list_projects(db: Session = Depends(get_db), current_user: User = Depends(ge
     projects = db.query(Project).all()
     result = []
     for p in projects:
-        task_count = db.query(TaskColumn).filter(TaskColumn.project_id == p.id).count()
+        task_count = db.query(Task).filter(Task.project_id == p.id).count()
         r = ProjectResponse.model_validate(p)
         r.task_count = task_count
         result.append(r)

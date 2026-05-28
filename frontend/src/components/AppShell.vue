@@ -6,6 +6,7 @@
         <div>
           <div class="brand-title">徐东摆地摊</div>
           <div class="brand-subtitle">轻量协作台</div>
+          <router-link to="/versions" class="brand-version">{{ currentVersion }}</router-link>
         </div>
       </div>
 
@@ -53,6 +54,7 @@ import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { Odometer, FolderOpened, Grid, List, Document, Calendar, User } from '@element-plus/icons-vue'
 import logoXudong from '@/assets/logo-xudong.svg'
+import { currentVersion } from '@/data/versionHistory'
 
 defineProps({
   title: {
