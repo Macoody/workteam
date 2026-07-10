@@ -93,6 +93,11 @@
   line-height: 76rpx;
 }
 
+.disabled-button {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
 .login-message {
   margin-top: 24rpx;
   padding: 18rpx;

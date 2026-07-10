@@ -1,4 +1,4 @@
-const { DEV_OPENID } = require('../../utils/config')
+const { DEV_OPENID, WECHAT_LOGIN_ENABLED } = require('../../utils/config')
 const { formRequest, request, saveSession } = require('../../utils/request')
 
 Page({
@@ -9,7 +9,8 @@ Page({
     messageType: '',
     wechatLoading: false,
     accountLoading: false,
-    bindLoading: false
+    bindLoading: false,
+    wechatLoginEnabled: WECHAT_LOGIN_ENABLED
   },
 
   onLoad() {
@@ -46,6 +47,10 @@ Page({
   },
 
   async wechatLogin() {
+    if (!this.data.wechatLoginEnabled) {
+      this.setData({ message: '微信登录暂未开通，请先使用账号登录', messageType: 'info' })
+      return
+    }
     if (this.data.wechatLoading) return
     this.setData({ wechatLoading: true, message: '' })
     try {
@@ -94,6 +99,10 @@ Page({
   },
 
   async bindWechat() {
+    if (!this.data.wechatLoginEnabled) {
+      this.setData({ message: '微信绑定暂未开通，请先使用账号登录', messageType: 'info' })
+      return
+    }
     if (!this.data.username || !this.data.password) {
       this.setData({ message: '请输入用户名和密码', messageType: 'error' })
       return

@@ -34,10 +34,13 @@ function request(options) {
           resolve(res.data)
           return
         }
-        if (res.statusCode === 401) {
+        if (auth && res.statusCode === 401) {
           handleUnauthorized()
         }
-        reject(res.data || { detail: '请求失败' })
+        reject({
+          ...(res.data || { detail: '请求失败' }),
+          statusCode: res.statusCode
+        })
       },
       fail(error) {
         reject(error)

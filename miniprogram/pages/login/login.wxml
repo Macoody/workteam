@@ -9,13 +9,6 @@
 
   <view class="panel login-card">
     <view class="card-title">登录任务中心</view>
-    <button class="primary-button" loading="{{wechatLoading}}" bindtap="wechatLogin">微信登录</button>
-
-    <view class="divider">
-      <text></text>
-      <view>或</view>
-      <text></text>
-    </view>
 
     <view class="form-field">
       <text>用户名</text>
@@ -26,8 +19,20 @@
       <input password value="{{password}}" data-field="password" bindinput="handleInput" placeholder="输入密码" />
     </view>
 
-    <button class="ghost-button" loading="{{accountLoading}}" bindtap="accountLogin">账号登录</button>
-    <button class="bind-button" loading="{{bindLoading}}" bindtap="bindWechat">绑定微信并登录</button>
+    <button class="primary-button" loading="{{accountLoading}}" bindtap="accountLogin">账号登录</button>
+
+    <view class="divider">
+      <text></text>
+      <view>微信</view>
+      <text></text>
+    </view>
+
+    <button class="ghost-button {{!wechatLoginEnabled ? 'disabled-button' : ''}}" disabled="{{!wechatLoginEnabled}}" loading="{{wechatLoading}}" bindtap="wechatLogin">
+      微信登录<text wx:if="{{!wechatLoginEnabled}}">（待开通）</text>
+    </button>
+    <button class="bind-button {{!wechatLoginEnabled ? 'disabled-button' : ''}}" disabled="{{!wechatLoginEnabled}}" loading="{{bindLoading}}" bindtap="bindWechat">
+      绑定微信并登录<text wx:if="{{!wechatLoginEnabled}}">（待开通）</text>
+    </button>
 
     <view wx:if="{{message}}" class="login-message {{messageType}}">
       {{message}}
