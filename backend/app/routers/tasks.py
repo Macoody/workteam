@@ -2,6 +2,7 @@
 任务路由
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 import os
 import uuid
@@ -11,14 +12,19 @@ from datetime import datetime
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.models import User, Task, TaskColumn, Attachment, Comment, CommentMention, Document, Project, ROLE_ADMIN
+from app.models.models import (
+    User, Task, TaskColumn, Attachment, Comment, CommentMention,
+    Document, Project, RecurringTaskRule, ROLE_ADMIN
+)
 from app.routers.auth import _update_last_active_time
 from app.schemas.schemas import (
     TaskCreate, TaskUpdate, TaskResponse,
-    CommentCreate, CommentResponse, AttachmentResponse, MentionNotificationResponse
+    CommentCreate, CommentResponse, AttachmentResponse, MentionNotificationResponse,
+    RecurringTaskRuleCreate, RecurringTaskRuleResponse
 )
 from app.routers.auth import get_current_user
 from app.routers.projects import ensure_default_columns
+from app.services.recurring_tasks import business_today, generate_due_recurring_tasks
 
 router = APIRouter()
 
@@ -88,8 +94,11 @@ def build_task_response(task: Task):
         delivery_dates=normalize_delivery_dates(parse_json_list(task.delivery_dates)),
         completed_by=parse_json_list(task.completed_by),
         tags=parse_json_list(task.tags),
+        recurrence_rule_id=task.recurrence_rule_id,
+        recurrence_occurrence_date=task.recurrence_occurrence_date,
         order=task.order,
         created_at=task.created_at,
+        updated_at=task.updated_at,
         attachments=task.attachments or [],
         recent_comments=recent_comments,
     )
@@ -131,14 +140,36 @@ def build_mention_notification(mention: CommentMention):
     )
 
 
+def validate_due_time(value: str | None):
+    if not value:
+        return None
+    value = value.strip()
+    if not re.match(r"^\d{2}:\d{2}$", value):
+        raise HTTPException(status_code=400, detail="每日交付时间格式应为 HH:mm")
+    hour, minute = [int(part) for part in value.split(":", 1)]
+    if hour > 23 or minute > 59:
+        raise HTTPException(status_code=400, detail="每日交付时间无效")
+    return value
+
+
+def build_recurring_rule_response(rule: RecurringTaskRule):
+    return RecurringTaskRuleResponse.model_validate(rule)
+
+
 @router.get("", response_model=list[TaskResponse])
 def list_tasks(project_id: int = None, my_tasks: bool = False, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    generate_due_recurring_tasks(db)
+    db.commit()
     query = db.query(Task)
     if project_id:
         query = query.filter(Task.project_id == project_id)
     if my_tasks:
         query = query.filter(Task.assignee_id == current_user.id)
-    tasks = query.order_by(Task.order.desc()).limit(100).all()
+    tasks = query.order_by(
+        func.coalesce(Task.updated_at, Task.created_at).desc(),
+        Task.created_at.desc(),
+        Task.id.desc(),
+    ).limit(100).all()
     return [build_task_response(task) for task in tasks]
 
 
@@ -177,6 +208,70 @@ def create_task(data: TaskCreate, db: Session = Depends(get_db), current_user: U
     _update_last_active_time(db, current_user)
     db.refresh(task)
     return build_task_response(task)
+
+
+@router.get("/recurring-rules", response_model=list[RecurringTaskRuleResponse])
+def list_recurring_rules(project_id: int = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    query = db.query(RecurringTaskRule)
+    if project_id:
+        query = query.filter(RecurringTaskRule.project_id == project_id)
+    rules = query.order_by(RecurringTaskRule.created_at.desc()).limit(100).all()
+    return [build_recurring_rule_response(rule) for rule in rules]
+
+
+@router.post("/recurring-rules", response_model=RecurringTaskRuleResponse)
+def create_recurring_rule(data: RecurringTaskRuleCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if data.end_date and data.end_date < data.start_date:
+        raise HTTPException(status_code=400, detail="结束日期不能早于开始日期")
+    if data.end_date and data.end_date < business_today():
+        raise HTTPException(status_code=400, detail="结束日期不能早于今天")
+
+    ensure_default_columns(db, data.project_id)
+    project = db.query(Project).filter(Project.id == data.project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    col = db.query(TaskColumn).filter(TaskColumn.id == data.column_id).first()
+    if not col:
+        raise HTTPException(status_code=404, detail="列不存在")
+    if col.project_id != data.project_id:
+        raise HTTPException(status_code=400, detail="任务项目和看板列不匹配")
+    validate_linked_document(db, data.project_id, data.linked_document_id)
+
+    rule = RecurringTaskRule(
+        project_id=data.project_id,
+        column_id=data.column_id,
+        title=data.title,
+        description=data.description,
+        node_output=data.node_output,
+        linked_document_id=data.linked_document_id,
+        assignee_id=data.assignee_id,
+        recurrence_type="daily",
+        start_date=data.start_date,
+        end_date=data.end_date,
+        due_time=validate_due_time(data.due_time),
+        is_active=True,
+        created_by=current_user.id,
+    )
+    db.add(rule)
+    db.flush()
+    generate_due_recurring_tasks(db)
+    db.commit()
+    _update_last_active_time(db, current_user)
+    db.refresh(rule)
+    return build_recurring_rule_response(rule)
+
+
+@router.delete("/recurring-rules/{rule_id}")
+def stop_recurring_rule(rule_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    rule = db.query(RecurringTaskRule).filter(RecurringTaskRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="周期任务规则不存在")
+    if rule.created_by != current_user.id and current_user.role != ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail="无权限停用该周期任务")
+    rule.is_active = False
+    db.commit()
+    _update_last_active_time(db, current_user)
+    return {"ok": True}
 
 
 @router.get("/{task_id}", response_model=TaskResponse)

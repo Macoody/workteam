@@ -12,7 +12,10 @@
         <el-table-column label="标题" min-width="320">
           <template #default="{ row }">
             <div class="task-list-cell">
-              <div class="task-list-title">{{ row.title }}</div>
+              <div class="task-list-title">
+                {{ row.title }}
+                <el-tag v-if="row.recurrence_rule_id" size="small" effect="light" class="task-kind-tag">周期</el-tag>
+              </div>
               <div v-if="row.recent_comments?.length" class="task-comment-stack">
                 <div v-for="comment in row.recent_comments" :key="comment.id" class="task-comment-chip">
                   <span class="task-comment-author">
@@ -189,7 +192,7 @@ async function loadTasks() {
   loading.value = true
   try {
     const params = filterProject.value ? `?project_id=${filterProject.value}` : ''
-    tasks.value = await api.get(`/tasks${params}`)
+    tasks.value = sortTasksByLatest(await api.get(`/tasks${params}`))
   } catch (error) {
     console.error(error)
   } finally {
@@ -332,6 +335,18 @@ function latestDeliveryDate(task) {
   return dates[dates.length - 1] || task?.due_date || null
 }
 
+function latestTaskTime(task) {
+  return latestDeliveryDate(task) || task?.updated_at || task?.created_at || null
+}
+
+function sortTasksByLatest(list) {
+  return [...(list || [])].sort((left, right) => {
+    const rightTime = dayjs(latestTaskTime(right)).valueOf() || 0
+    const leftTime = dayjs(latestTaskTime(left)).valueOf() || 0
+    return rightTime - leftTime || (right?.id || 0) - (left?.id || 0)
+  })
+}
+
 function formatDate(value) {
   return value ? dayjs(value).format('MM-DD HH:mm') : '--'
 }
@@ -346,6 +361,11 @@ function formatDate(value) {
 .task-list-title {
   color: #0f172a;
   font-weight: 700;
+}
+
+.task-kind-tag {
+  margin-left: 8px;
+  vertical-align: 1px;
 }
 
 .user-chip {

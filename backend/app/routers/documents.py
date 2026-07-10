@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from app.core.config import settings
@@ -30,6 +30,7 @@ BUSINESS_TZ = ZoneInfo(settings.BUSINESS_TIMEZONE)
 DOCUMENT_ACTION_CREATE = "create"
 DOCUMENT_ACTION_VIEW = "view"
 DOCUMENT_ACTION_EDIT = "edit"
+DOCUMENT_VIEW_GROUP_WINDOW = timedelta(hours=12)
 
 
 # === 文档 CRUD ===
@@ -40,25 +41,23 @@ def document_query(db: Session):
     )
 
 
-def utc_now_naive():
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+def business_now():
+    return datetime.now(BUSINESS_TZ)
 
 
 def to_business_time(value):
     if value is None:
         return None
     if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
+        return value.replace(tzinfo=BUSINESS_TZ)
     return value.astimezone(BUSINESS_TZ)
 
 
 def timestamp_close(left, right) -> bool:
     if not left or not right:
         return False
-    if left.tzinfo is not None:
-        left = left.replace(tzinfo=None)
-    if right.tzinfo is not None:
-        right = right.replace(tzinfo=None)
+    left = to_business_time(left)
+    right = to_business_time(right)
     return abs((left - right).total_seconds()) < 1
 
 
@@ -76,6 +75,42 @@ def build_activity_response(activity: DocumentActivityLog):
     return item
 
 
+def build_compact_activity_responses(activities: list[DocumentActivityLog]):
+    compacted = []
+    view_groups_by_user: dict[int, list[dict]] = {}
+
+    for activity in activities:
+        if activity.action != DOCUMENT_ACTION_VIEW:
+            compacted.append(build_activity_response(activity))
+            continue
+
+        created_at = to_business_time(activity.created_at)
+        user_groups = view_groups_by_user.setdefault(activity.user_id, [])
+        current_group = user_groups[-1] if user_groups else None
+        if (
+            current_group
+            and created_at
+            and current_group["latest_at"]
+            and current_group["latest_at"] - created_at <= DOCUMENT_VIEW_GROUP_WINDOW
+        ):
+            current_group["read_count"] += 1
+            current_group["response"].read_count = current_group["read_count"]
+            continue
+
+        response = build_activity_response(activity)
+        response.read_count = 1
+        user_groups.append(
+            {
+                "latest_at": created_at,
+                "read_count": 1,
+                "response": response,
+            }
+        )
+        compacted.append(response)
+
+    return compacted
+
+
 def add_document_activity(
     db: Session,
     document_id: int,
@@ -89,7 +124,7 @@ def add_document_activity(
         document_id=document_id,
         user_id=user_id,
         action=action,
-        created_at=created_at or utc_now_naive(),
+        created_at=created_at or business_now(),
     )
     db.add(activity)
     return activity
@@ -107,7 +142,7 @@ def ensure_document_activity_seed(db: Session, doc: Document):
             doc.id,
             doc.creator_id,
             DOCUMENT_ACTION_CREATE,
-            doc.created_at or doc.last_edited_at or utc_now_naive(),
+            doc.created_at or doc.last_edited_at or business_now(),
         )
     if doc.last_editor_id and doc.last_edited_at:
         created_at = doc.created_at
@@ -148,9 +183,12 @@ def list_documents(
 
 @router.post("", response_model=DocumentResponse)
 def create_document(data: DocumentCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    now = utc_now_naive()
+    title = data.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="文档标题不能为空")
+    now = business_now()
     doc = Document(
-        title=data.title,
+        title=title,
         content=data.content or "",
         doc_type=data.doc_type,
         project_id=data.project_id,
@@ -203,7 +241,7 @@ def list_document_activities(doc_id: int, db: Session = Depends(get_db), current
         DocumentActivityLog.created_at.desc(),
         DocumentActivityLog.id.desc(),
     ).all()
-    return [build_activity_response(activity) for activity in activities]
+    return build_compact_activity_responses(activities)
 
 
 @router.put("/{doc_id}", response_model=DocumentResponse)
@@ -213,15 +251,19 @@ def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="文档不存在")
     # 所有人可编辑任意文档（管理员可编辑全部）
     edited = False
-    if data.title is not None and data.title != doc.title:
-        doc.title = data.title
-        edited = True
+    if data.title is not None:
+        title = data.title.strip()
+        if not title:
+            raise HTTPException(status_code=400, detail="文档标题不能为空")
+        if title != doc.title:
+            doc.title = title
+            edited = True
     if data.content is not None and data.content != doc.content:
         doc.content = data.content
         edited = True
     if edited:
         ensure_document_activity_seed(db, doc)
-        now = utc_now_naive()
+        now = business_now()
         doc.last_editor_id = current_user.id
         doc.last_editor = current_user
         doc.last_edited_at = now
@@ -255,12 +297,11 @@ def share_document(doc_id: int, mode: str = "readonly", expire_hours: int = 72, 
         raise HTTPException(status_code=403, detail="无分享权限")
     
     import secrets
-    from datetime import datetime, timedelta
     
     doc.is_public = True
     doc.share_token = secrets.token_urlsafe(32)
     doc.share_mode = mode
-    doc.share_expire = datetime.utcnow() + timedelta(hours=expire_hours)
+    doc.share_expire = business_now() + timedelta(hours=expire_hours)
     db.commit()
     
     share_url = f"/api/documents/shared/{doc.share_token}"
@@ -272,8 +313,7 @@ def view_shared_document(token: str, db: Session = Depends(get_db)):
     doc = db.query(Document).filter(Document.share_token == token).first()
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在或链接已失效")
-    from datetime import datetime
-    if doc.share_expire and doc.share_expire < datetime.utcnow():
+    if doc.share_expire and to_business_time(doc.share_expire) < business_now():
         raise HTTPException(status_code=410, detail="分享链接已过期")
     return doc
 

@@ -41,6 +41,8 @@ _LEGACY_COLUMN_DDL: dict[str, list[tuple[str, str]]] = {
         ("linked_document_id", "INTEGER"),
         ("delivery_dates", "TEXT"),
         ("completed_by", "TEXT"),
+        ("recurrence_rule_id", "INTEGER"),
+        ("recurrence_occurrence_date", "DATE"),
     ],
     "documents": [
         ("last_editor_id", "INTEGER"),
@@ -121,6 +123,29 @@ def ensure_runtime_schema() -> None:
                         "UPDATE documents "
                         "SET last_edited_at = COALESCE(updated_at, created_at) "
                         "WHERE last_edited_at IS NULL"
+                    )
+                )
+
+    # 1.1) 周期任务生成防重索引
+    if (
+        inspector.has_table("tasks")
+        and _column_exists(inspector, "tasks", "recurrence_rule_id")
+        and _column_exists(inspector, "tasks", "recurrence_occurrence_date")
+        and not _index_exists(inspector, "tasks", "ux_tasks_recurring_occurrence")
+    ):
+        with engine.begin() as conn:
+            if _dialect_name() == "postgresql":
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS ux_tasks_recurring_occurrence "
+                        "ON tasks (recurrence_rule_id, recurrence_occurrence_date)"
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX ux_tasks_recurring_occurrence "
+                        "ON tasks (recurrence_rule_id, recurrence_occurrence_date)"
                     )
                 )
 

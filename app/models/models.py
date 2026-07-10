@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Text,
     DateTime,
+    Date,
     ForeignKey,
     Boolean,
 )
@@ -96,6 +97,37 @@ class TaskColumn(Base):
     tasks = relationship("Task", back_populates="column")
 
 
+class RecurringTaskRule(Base):
+    __tablename__ = "recurring_task_rules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(
+        Integer,
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    column_id = Column(Integer, ForeignKey("task_columns.id", ondelete="SET NULL"))
+    title = Column(String(500), nullable=False)
+    description = Column(Text)
+    node_output = Column(Text)
+    linked_document_id = Column(Integer)
+    assignee_id = Column(Integer, ForeignKey("users.id"))
+    recurrence_type = Column(String(20), default="daily")
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date)
+    due_time = Column(String(5))
+    is_active = Column(Boolean, default=True)
+    created_by = Column(Integer, ForeignKey("users.id"))
+    last_generated_date = Column(Date)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    project = relationship("Project")
+    column = relationship("TaskColumn")
+    assignee = relationship("User", foreign_keys=[assignee_id])
+    creator = relationship("User", foreign_keys=[created_by])
+
+
 class Task(Base):
     __tablename__ = "tasks"
 
@@ -120,6 +152,8 @@ class Task(Base):
     delivery_dates = Column(Text)
     completed_by = Column(Text)
     tags = Column(Text)
+    recurrence_rule_id = Column(Integer, ForeignKey("recurring_task_rules.id"))
+    recurrence_occurrence_date = Column(Date)
     order = Column(Integer, default=0)
     view_count = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -128,6 +162,7 @@ class Task(Base):
     project = relationship("Project", back_populates="tasks")
     column = relationship("TaskColumn", back_populates="tasks")
     assignee = relationship("User")
+    recurrence_rule = relationship("RecurringTaskRule")
     attachments = relationship(
         "Attachment", back_populates="task", cascade="all, delete-orphan"
     )

@@ -2,7 +2,7 @@
 Pydantic Schemas（API请求/响应模型）
 """
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional, List
 
 
@@ -161,10 +161,49 @@ class TaskResponse(BaseModel):
     delivery_dates: Optional[List[datetime]] = []
     completed_by: Optional[List[str]] = []
     tags: Optional[List[str]] = []
+    recurrence_rule_id: Optional[int] = None
+    recurrence_occurrence_date: Optional[date] = None
     order: int
     created_at: Optional[datetime]
+    updated_at: Optional[datetime] = None
     attachments: List["AttachmentResponse"] = []
     recent_comments: List["CommentResponse"] = []
+
+    class Config:
+        from_attributes = True
+
+
+class RecurringTaskRuleCreate(BaseModel):
+    project_id: int
+    column_id: int
+    title: str
+    description: Optional[str] = None
+    node_output: Optional[str] = None
+    linked_document_id: Optional[int] = None
+    assignee_id: Optional[int] = None
+    start_date: date
+    end_date: Optional[date] = None
+    due_time: Optional[str] = None
+
+
+class RecurringTaskRuleResponse(BaseModel):
+    id: int
+    project_id: int
+    column_id: Optional[int]
+    title: str
+    description: Optional[str]
+    node_output: Optional[str]
+    linked_document_id: Optional[int]
+    assignee_id: Optional[int]
+    assignee: Optional[UserResponse] = None
+    recurrence_type: str
+    start_date: date
+    end_date: Optional[date]
+    due_time: Optional[str]
+    is_active: bool
+    created_by: Optional[int]
+    last_generated_date: Optional[date]
+    created_at: Optional[datetime]
 
     class Config:
         from_attributes = True
@@ -256,6 +295,7 @@ class DocumentActivityResponse(BaseModel):
     user: Optional[UserResponse] = None
     action: str
     created_at: Optional[datetime]
+    read_count: int = 1
 
     class Config:
         from_attributes = True

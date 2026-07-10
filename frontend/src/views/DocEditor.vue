@@ -8,6 +8,25 @@
     </template>
 
     <div class="editor-shell">
+      <div v-if="doc" class="document-title-editor">
+        <div class="document-title-field">
+          <span class="document-title-label">文档标题</span>
+          <el-input
+            v-model="titleDraft"
+            size="large"
+            placeholder="输入文档标题"
+            @keyup.enter="saveTitle"
+          />
+        </div>
+        <el-button
+          type="primary"
+          :loading="titleSaving"
+          :disabled="!titleChanged"
+          @click="saveTitle"
+        >
+          保存标题
+        </el-button>
+      </div>
       <div class="editor-toolbar">
         <el-button size="small" @click="execCmd('bold')" :type="isActive('bold') ? 'primary' : 'default'"><b>B</b></el-button>
         <el-button size="small" @click="execCmd('italic')" :type="isActive('italic') ? 'primary' : 'default'"><i>I</i></el-button>
@@ -46,7 +65,7 @@
       <div v-if="activities.length === 0" class="empty-card compact-history-empty">还没有历史记录。</div>
       <div v-else class="history-list">
         <div v-for="item in activities" :key="item.id" class="history-item">
-          <el-tag :type="activityTagType(item.action)" effect="light">{{ activityLabel(item.action) }}</el-tag>
+          <el-tag :type="activityTagType(item.action)" effect="light">{{ activityLabel(item) }}</el-tag>
           <div class="history-main">
             <div class="history-title">{{ activityUserName(item) }}</div>
             <div class="history-time">{{ formatDate(item.created_at) }}</div>
@@ -82,7 +101,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { useAuthStore } from '@/stores/auth'
@@ -102,6 +121,8 @@ const router = useRouter()
 const auth = useAuthStore()
 const loading = ref(true)
 const doc = ref(null)
+const titleDraft = ref('')
+const titleSaving = ref(false)
 const editor = ref(null)
 const saveStatusText = ref('已保存')
 const activities = ref([])
@@ -116,6 +137,10 @@ const genLoading = ref(false)
 const linkDialog = ref(false)
 const linkUrl = ref('')
 
+const titleChanged = computed(() => {
+  return titleDraft.value.trim() !== (doc.value?.title || '')
+})
+
 onMounted(async () => {
   const id = route.params.id
   if (!id) {
@@ -129,6 +154,7 @@ onMounted(async () => {
       api.get(`/documents/${id}`),
     ])
     doc.value = currentDoc
+    titleDraft.value = currentDoc?.title || ''
     initEditor(doc.value?.content || '')
     await loadActivities()
   } catch (error) {
@@ -182,6 +208,30 @@ async function autoSave() {
     console.error(error)
     saveStatusText.value = '保存失败'
     ElMessage.error(error?.response?.data?.detail || '文档自动保存失败')
+  }
+}
+
+async function saveTitle() {
+  if (!doc.value) return
+  const title = titleDraft.value.trim()
+  if (!title) {
+    ElMessage.warning('请输入文档标题')
+    return
+  }
+  if (title === doc.value.title) return
+
+  titleSaving.value = true
+  try {
+    const updated = await api.put(`/documents/${doc.value.id}`, { title })
+    doc.value = updated
+    titleDraft.value = updated.title || title
+    await loadActivities()
+    saveStatusText.value = `标题已保存 ${dayjs().format('HH:mm:ss')}`
+    ElMessage.success('标题已保存')
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.detail || '标题保存失败')
+  } finally {
+    titleSaving.value = false
   }
 }
 
@@ -263,10 +313,10 @@ async function loadActivities() {
   }
 }
 
-function activityLabel(action) {
-  if (action === 'view') return '浏览'
-  if (action === 'edit') return '编辑'
-  if (action === 'create') return '创建'
+function activityLabel(item) {
+  if (item?.action === 'view') return `浏览（${item.read_count || 1}）`
+  if (item?.action === 'edit') return '编辑'
+  if (item?.action === 'create') return '创建'
   return '记录'
 }
 
@@ -335,6 +385,28 @@ async function deleteDoc() {
   background: rgba(255, 255, 255, 0.86);
   color: #64748b;
   font-size: 12px;
+}
+
+.document-title-editor {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.document-title-field {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 8px;
+}
+
+.document-title-label {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .document-history {
@@ -427,5 +499,16 @@ async function deleteDoc() {
 .tiptap-editor :deep(mark) {
   border-radius: 0.35em;
   padding: 0.08em 0.2em;
+}
+
+@media (max-width: 640px) {
+  .document-title-editor {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .document-title-editor .el-button {
+    width: 100%;
+  }
 }
 </style>

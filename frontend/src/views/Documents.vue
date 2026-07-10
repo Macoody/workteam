@@ -17,7 +17,10 @@
         <div class="item-meta">创建于 {{ formatDate(doc.created_at) }}</div>
         <div style="margin-top: 18px; display: flex; justify-content: space-between; align-items: center">
           <span class="muted">{{ doc.view_count || 0 }} 次浏览</span>
-          <el-button size="small" @click.stop="shareDoc(doc)">分享</el-button>
+          <div class="doc-card-actions">
+            <el-button size="small" @click.stop="openRename(doc)">改名</el-button>
+            <el-button size="small" @click.stop="shareDoc(doc)">分享</el-button>
+          </div>
         </div>
       </div>
     </div>
@@ -37,6 +40,17 @@
         </el-form-item>
         <el-button type="primary" :loading="loading" native-type="submit" style="width: 100%">
           创建文档
+        </el-button>
+      </el-form>
+    </el-dialog>
+
+    <el-dialog v-model="renameDialog" title="修改标题" width="420px">
+      <el-form :model="renameForm" label-position="top" @submit.prevent="saveRename">
+        <el-form-item label="文档标题">
+          <el-input v-model="renameForm.title" placeholder="输入新的文档标题" @keyup.enter="saveRename" />
+        </el-form-item>
+        <el-button type="primary" :loading="renameLoading" native-type="submit" style="width: 100%">
+          保存标题
         </el-button>
       </el-form>
     </el-dialog>
@@ -74,6 +88,9 @@ const docs = ref([])
 const showCreate = ref(false)
 const loading = ref(false)
 const form = reactive({ title: '', doc_type: 'doc', content: '' })
+const renameDialog = ref(false)
+const renameLoading = ref(false)
+const renameForm = reactive({ id: null, title: '' })
 
 const shareDialog = ref(false)
 const shareLink = ref('')
@@ -91,13 +108,14 @@ async function loadDocs() {
 }
 
 async function handleCreate() {
-  if (!form.title) {
+  const title = form.title.trim()
+  if (!title) {
     ElMessage.warning('请输入标题')
     return
   }
   loading.value = true
   try {
-    await api.post('/documents', form)
+    await api.post('/documents', { ...form, title })
     ElMessage.success('创建成功')
     showCreate.value = false
     form.title = ''
@@ -107,6 +125,31 @@ async function handleCreate() {
     ElMessage.error('创建失败')
   } finally {
     loading.value = false
+  }
+}
+
+function openRename(doc) {
+  renameForm.id = doc.id
+  renameForm.title = doc.title || ''
+  renameDialog.value = true
+}
+
+async function saveRename() {
+  const title = renameForm.title.trim()
+  if (!title) {
+    ElMessage.warning('请输入标题')
+    return
+  }
+  renameLoading.value = true
+  try {
+    await api.put(`/documents/${renameForm.id}`, { title })
+    ElMessage.success('标题已保存')
+    renameDialog.value = false
+    await loadDocs()
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.detail || '保存失败')
+  } finally {
+    renameLoading.value = false
   }
 }
 
@@ -154,3 +197,15 @@ function formatDate(value) {
   return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '--'
 }
 </script>
+
+<style scoped>
+.doc-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doc-card-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+</style>

@@ -11,6 +11,7 @@ from app.schemas.schemas import ColumnCreate, ColumnUpdate, ColumnResponse, Task
 from app.routers.auth import get_current_user, require_admin
 from app.routers.tasks import build_task_response
 from app.routers.projects import ensure_default_columns
+from app.services.recurring_tasks import generate_due_recurring_tasks
 
 router = APIRouter()
 
@@ -21,6 +22,8 @@ def get_kanban(project_id: int, db: Session = Depends(get_db), current_user: Use
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
     ensure_default_columns(db, project_id)
+    generate_due_recurring_tasks(db)
+    db.commit()
     columns = db.query(TaskColumn).filter(TaskColumn.project_id == project_id).order_by(TaskColumn.order).all()
     result = []
     for col in columns:

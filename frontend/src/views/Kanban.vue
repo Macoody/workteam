@@ -44,6 +44,7 @@
                   <span class="user-presence-text">{{ userPresenceText(resolveUser(task.assignee_id)) }}</span>
                 </span>
                 <span v-if="latestDeliveryDate(task)" class="pill">{{ formatDate(latestDeliveryDate(task)) }}</span>
+                <span v-if="task.recurrence_rule_id" class="pill">周期</span>
               </div>
               <div v-if="task.description" class="task-card-note">{{ task.description }}</div>
               <div v-if="task.linked_document_id" class="task-card-link">已关联文档</div>
@@ -140,6 +141,12 @@
 
     <el-dialog v-model="addTaskDialog" title="新建任务" width="520px">
       <el-form :model="newTask" label-position="top" @submit.prevent="createTask">
+        <el-form-item label="任务类型">
+          <el-radio-group v-model="newTask.task_type">
+            <el-radio-button label="once">一次性任务</el-radio-button>
+            <el-radio-button label="daily">每日重复</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="任务标题">
           <el-input v-model="newTask.title" placeholder="请输入任务标题" />
         </el-form-item>
@@ -159,11 +166,27 @@
             <el-option v-for="user in users" :key="user.id" :label="user.display_name || user.username" :value="user.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="交付时间">
+        <el-form-item v-if="newTask.task_type === 'once'" label="交付时间">
           <el-date-picker v-model="newTask.due_date" type="datetime" style="width: 100%" />
         </el-form-item>
+        <template v-else>
+          <el-form-item label="开始日期">
+            <el-date-picker v-model="newTask.recurrence_start_date" type="date" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="结束日期">
+            <el-date-picker v-model="newTask.recurrence_end_date" type="date" clearable style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="每日交付时间">
+            <el-time-picker
+              v-model="newTask.recurrence_due_time"
+              format="HH:mm"
+              value-format="HH:mm"
+              style="width: 100%"
+            />
+          </el-form-item>
+        </template>
         <el-button type="primary" :loading="creating" native-type="submit" style="width: 100%">
-          创建任务
+          {{ newTask.task_type === 'daily' ? '创建周期规则' : '创建任务' }}
         </el-button>
       </el-form>
     </el-dialog>
@@ -210,12 +233,16 @@ const showExtensionPicker = ref(false)
 
 const addTaskDialog = ref(false)
 const newTask = reactive({
+  task_type: 'once',
   title: '',
   description: '',
   node_output: '',
   linked_document_id: null,
   assignee_id: null,
-  due_date: null
+  due_date: null,
+  recurrence_start_date: new Date(),
+  recurrence_end_date: null,
+  recurrence_due_time: '23:59'
 })
 const creating = ref(false)
 
@@ -408,11 +435,15 @@ async function showAddTask() {
     await loadKanban()
   }
   newTask.title = ''
+  newTask.task_type = 'once'
   newTask.description = ''
   newTask.node_output = ''
   newTask.linked_document_id = null
   newTask.assignee_id = null
   newTask.due_date = null
+  newTask.recurrence_start_date = new Date()
+  newTask.recurrence_end_date = null
+  newTask.recurrence_due_time = '23:59'
   addTaskDialog.value = true
 }
 
@@ -429,13 +460,38 @@ async function createTask() {
   }
   creating.value = true
   try {
-    await api.post('/tasks', {
-      ...newTask,
-      due_date: newTask.due_date ? dayjs(newTask.due_date).toISOString() : null,
-      column_id: pendingColumnId,
-      project_id: selectedProject.value
-    })
-    ElMessage.success('任务创建成功')
+    if (newTask.task_type === 'daily') {
+      if (!newTask.recurrence_start_date) {
+        ElMessage.warning('请选择开始日期')
+        creating.value = false
+        return
+      }
+      await api.post('/tasks/recurring-rules', {
+        title: newTask.title,
+        description: newTask.description,
+        node_output: newTask.node_output,
+        linked_document_id: newTask.linked_document_id,
+        assignee_id: newTask.assignee_id,
+        start_date: dayjs(newTask.recurrence_start_date).format('YYYY-MM-DD'),
+        end_date: newTask.recurrence_end_date ? dayjs(newTask.recurrence_end_date).format('YYYY-MM-DD') : null,
+        due_time: newTask.recurrence_due_time || null,
+        column_id: pendingColumnId,
+        project_id: selectedProject.value
+      })
+      ElMessage.success('周期任务规则已创建')
+    } else {
+      await api.post('/tasks', {
+        title: newTask.title,
+        description: newTask.description,
+        node_output: newTask.node_output,
+        linked_document_id: newTask.linked_document_id,
+        assignee_id: newTask.assignee_id,
+        due_date: newTask.due_date ? dayjs(newTask.due_date).toISOString() : null,
+        column_id: pendingColumnId,
+        project_id: selectedProject.value
+      })
+      ElMessage.success('任务创建成功')
+    }
     addTaskDialog.value = false
     await loadKanban()
   } catch (error) {
