@@ -23,6 +23,10 @@
         <el-button size="small" @click="undo">撤销</el-button>
         <el-button size="small" @click="redo">重做</el-button>
       </div>
+      <div v-if="doc" class="editor-meta-bar">
+        <span>创建人 {{ documentCreatorName(doc) }}</span>
+        <span>最后编辑 {{ documentEditorName(doc) }} · {{ formatDate(documentEditedAt(doc)) }}</span>
+      </div>
 
       <div class="editor-area">
         <div v-if="loading" class="empty-card">加载中...</div>
@@ -203,6 +207,24 @@ function redo() {
   editor.value?.chain().focus().redo().run()
 }
 
+function documentCreatorName(item) {
+  const user = item?.creator
+  return user?.display_name || user?.username || '未知成员'
+}
+
+function documentEditorName(item) {
+  const user = item?.last_editor || item?.creator
+  return user?.display_name || user?.username || '未知成员'
+}
+
+function documentEditedAt(item) {
+  return item?.last_edited_at || item?.updated_at || item?.created_at
+}
+
+function formatDate(value) {
+  return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '--'
+}
+
 function shareDoc() {
   shareLink.value = doc.value?.share_token ? `${location.origin}/api/documents/shared/${doc.value.share_token}` : ''
   shareDialog.value = true
@@ -246,6 +268,17 @@ async function deleteDoc() {
   color: #0f172a;
   font-size: 12px;
   font-weight: 600;
+}
+
+.editor-meta-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.86);
+  color: #64748b;
+  font-size: 12px;
 }
 
 .tiptap-editor :deep(.editor-prosemirror) {

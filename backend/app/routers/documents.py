@@ -2,9 +2,12 @@
 文档中心路由
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from sqlalchemy import text
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
 import os
 import uuid
+from datetime import datetime
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -20,6 +23,13 @@ ALLOWED_DOC_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", 
 
 
 # === 文档 CRUD ===
+def document_query(db: Session):
+    return db.query(Document).options(
+        joinedload(Document.creator),
+        joinedload(Document.last_editor),
+    )
+
+
 @router.get("", response_model=list[DocumentResponse])
 def list_documents(
     folder_id: int = None,
@@ -28,18 +38,23 @@ def list_documents(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    query = db.query(Document)
+    query = document_query(db)
     if folder_id is not None:
         query = query.filter(Document.folder_id == folder_id)
     if project_id:
         query = query.filter(Document.project_id == project_id)
     if my_docs:
         query = query.filter(Document.creator_id == current_user.id)
-    return query.order_by(Document.updated_at.desc()).limit(100).all()
+    return query.order_by(
+        Document.last_edited_at.desc(),
+        Document.updated_at.desc(),
+        Document.created_at.desc(),
+    ).limit(100).all()
 
 
 @router.post("", response_model=DocumentResponse)
 def create_document(data: DocumentCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    now = datetime.now()
     doc = Document(
         title=data.title,
         content=data.content or "",
@@ -47,6 +62,8 @@ def create_document(data: DocumentCreate, db: Session = Depends(get_db), current
         project_id=data.project_id,
         folder_id=data.folder_id,
         creator_id=current_user.id,
+        last_editor_id=current_user.id,
+        last_edited_at=now,
     )
     db.add(doc)
     db.commit()
@@ -57,9 +74,17 @@ def create_document(data: DocumentCreate, db: Session = Depends(get_db), current
 
 @router.get("/{doc_id}", response_model=DocumentResponse)
 def get_document(doc_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    doc = db.query(Document).filter(Document.id == doc_id).first()
+    doc = document_query(db).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在")
+    db.execute(
+        text(
+            "UPDATE documents "
+            "SET view_count = COALESCE(view_count, 0) + 1 "
+            "WHERE id = :doc_id"
+        ),
+        {"doc_id": doc_id},
+    )
     doc.view_count = (doc.view_count or 0) + 1
     db.commit()
     return doc
@@ -67,15 +92,21 @@ def get_document(doc_id: int, db: Session = Depends(get_db), current_user: User 
 
 @router.put("/{doc_id}", response_model=DocumentResponse)
 def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    doc = db.query(Document).filter(Document.id == doc_id).first()
+    doc = document_query(db).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在")
     # 所有人可编辑任意文档（管理员可编辑全部）
+    edited = False
     if data.title is not None:
         doc.title = data.title
+        edited = True
     if data.content is not None:
         doc.content = data.content
+        edited = True
+    if edited:
         doc.last_editor_id = current_user.id
+        doc.last_editor = current_user
+        doc.last_edited_at = datetime.now()
     db.commit()
     _update_last_active_time(db, current_user)
     db.refresh(doc)

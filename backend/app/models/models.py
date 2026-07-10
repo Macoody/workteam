@@ -205,8 +205,12 @@ class Document(Base):
     share_expire = Column(DateTime(timezone=True))
     view_count = Column(Integer, default=0)
     last_editor_id = Column(Integer, ForeignKey("users.id"))
+    last_edited_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    creator = relationship("User", foreign_keys=[creator_id])
+    last_editor = relationship("User", foreign_keys=[last_editor_id])
 
 
 class Folder(Base):

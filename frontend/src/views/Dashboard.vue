@@ -140,7 +140,7 @@
             </span>
             <span class="item-main">
               <span class="item-title">{{ doc.title }}</span>
-              <span class="item-meta">{{ docTypeLabel(doc.doc_type) }} · 更新 {{ formatDate(doc.updated_at || doc.created_at) }}</span>
+              <span class="item-meta">{{ docTypeLabel(doc.doc_type) }} · 最后编辑 {{ documentEditorName(doc) }} · {{ formatDate(documentEditedAt(doc)) }}</span>
             </span>
             <el-icon class="row-arrow"><ArrowRight /></el-icon>
           </button>
@@ -315,6 +315,15 @@ function docTypeLabel(type) {
   if (type === 'ppt') return '演示'
   if (type === 'file') return '文件'
   return '文档'
+}
+
+function documentEditorName(doc) {
+  const user = doc?.last_editor || doc?.creator
+  return user?.display_name || user?.username || '未知成员'
+}
+
+function documentEditedAt(doc) {
+  return doc?.last_edited_at || doc?.updated_at || doc?.created_at
 }
 
 async function openMention(item) {

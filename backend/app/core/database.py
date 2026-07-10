@@ -44,6 +44,7 @@ _LEGACY_COLUMN_DDL: dict[str, list[tuple[str, str]]] = {
     ],
     "documents": [
         ("last_editor_id", "INTEGER"),
+        ("last_edited_at", "TIMESTAMP WITH TIME ZONE"),
     ],
 }
 
@@ -102,6 +103,26 @@ def ensure_runtime_schema() -> None:
             if not _column_exists(inspector, table, column_name):
                 with engine.begin() as conn:
                     conn.execute(text(_add_column_sql(table, column_name, ddl_type)))
+    inspector = inspect(engine)
+
+    if inspector.has_table("documents"):
+        with engine.begin() as conn:
+            if _column_exists(inspector, "documents", "last_editor_id"):
+                conn.execute(
+                    text(
+                        "UPDATE documents "
+                        "SET last_editor_id = creator_id "
+                        "WHERE last_editor_id IS NULL AND creator_id IS NOT NULL"
+                    )
+                )
+            if _column_exists(inspector, "documents", "last_edited_at"):
+                conn.execute(
+                    text(
+                        "UPDATE documents "
+                        "SET last_edited_at = COALESCE(updated_at, created_at) "
+                        "WHERE last_edited_at IS NULL"
+                    )
+                )
 
     # 2) 补 comment_mentions 表（如果模型声明了 Base 之后还没建）
     if not inspector.has_table("comment_mentions"):

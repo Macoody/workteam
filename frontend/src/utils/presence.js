@@ -1,8 +1,7 @@
 import dayjs from 'dayjs'
 
 export function isUserOnline(user) {
-  if (!user?.is_online || !user?.last_active_time) return false
-  return dayjs().diff(dayjs(user.last_active_time), 'second') <= 90
+  return Boolean(user?.is_online)
 }
 
 export function userPresenceText(user) {

@@ -13,7 +13,8 @@
           <el-tag v-if="doc.is_public" type="success" effect="light">已分享</el-tag>
         </div>
         <div style="margin-top: 18px" class="item-title">{{ doc.title }}</div>
-        <div class="item-meta">创建于 {{ formatDate(doc.created_at) }}<span v-if="doc.updated_at"> · 更新于 {{ formatDate(doc.updated_at) }}</span></div>
+        <div class="item-meta">最后编辑 {{ documentEditorName(doc) }} · {{ formatDate(documentEditedAt(doc)) }}</div>
+        <div class="item-meta">创建于 {{ formatDate(doc.created_at) }}</div>
         <div style="margin-top: 18px; display: flex; justify-content: space-between; align-items: center">
           <span class="muted">{{ doc.view_count || 0 }} 次浏览</span>
           <el-button size="small" @click.stop="shareDoc(doc)">分享</el-button>
@@ -34,7 +35,7 @@
             <el-option label="其他" value="file" />
           </el-select>
         </el-form-item>
-        <el-button type="primary" :loading="loading" native-type="submit" style="width: 100%" @click="handleCreate">
+        <el-button type="primary" :loading="loading" native-type="submit" style="width: 100%">
           创建文档
         </el-button>
       </el-form>
@@ -138,6 +139,15 @@ function docTypeLabel(type) {
   if (type === 'ppt') return '演示'
   if (type === 'file') return '文件'
   return '文档'
+}
+
+function documentEditorName(doc) {
+  const user = doc?.last_editor || doc?.creator
+  return user?.display_name || user?.username || '未知成员'
+}
+
+function documentEditedAt(doc) {
+  return doc?.last_edited_at || doc?.updated_at || doc?.created_at
 }
 
 function formatDate(value) {

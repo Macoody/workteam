@@ -241,6 +241,7 @@ class DocumentResponse(BaseModel):
     view_count: int
     last_editor_id: Optional[int] = None
     last_editor: Optional[UserResponse] = None
+    last_edited_at: Optional[datetime] = None
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
 
