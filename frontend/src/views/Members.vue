@@ -173,13 +173,13 @@
 
 <script setup>
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
-import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
 import { USER_COLOR_OPTIONS } from '@/utils/userColors'
 import { isUserOnline, userPresenceText, userPresenceTitle } from '@/utils/presence'
+import { businessTimeValue, formatBusinessTime } from '@/utils/time'
 
 const auth = useAuthStore()
 const loading = ref(false)
@@ -389,18 +389,18 @@ function latestTaskTime(task) {
 
 function sortTasksByLatest(list) {
   return [...(list || [])].sort((left, right) => {
-    const rightTime = dayjs(latestTaskTime(right)).valueOf() || 0
-    const leftTime = dayjs(latestTaskTime(left)).valueOf() || 0
+    const rightTime = businessTimeValue(latestTaskTime(right))
+    const leftTime = businessTimeValue(latestTaskTime(left))
     return rightTime - leftTime || (right?.id || 0) - (left?.id || 0)
   })
 }
 
 function formatDate(value) {
-  return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '--'
+  return formatBusinessTime(value)
 }
 
 function formatTaskDate(value) {
-  return value ? dayjs(value).format('MM-DD HH:mm') : '--'
+  return formatBusinessTime(value, 'MM-DD HH:mm')
 }
 </script>
 
@@ -541,7 +541,14 @@ function formatTaskDate(value) {
 }
 
 .member-task-item.completed {
-  background: #f8fafc;
+  background: rgba(220, 252, 231, 0.52);
+  color: #94a3b8;
+}
+
+.member-task-item.completed .member-task-title,
+.member-task-item.completed .member-task-meta,
+.member-task-item.completed .member-task-output {
+  color: #94a3b8;
 }
 
 .member-task-header {

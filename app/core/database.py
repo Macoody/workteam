@@ -6,10 +6,11 @@
   这样本地首次启动或灰度阶段都不会因为 schema 不齐导致崩溃。
   老库（MySQL 8.x）迁移完成后，这个函数仅在补列时是幂等的，可继续保留。
 """
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from .config import settings
+from .timezone import business_utc_offset
 
 # 启动期配置校验（DB URL/密钥必须存在）
 settings.validate()
@@ -21,6 +22,19 @@ engine = create_engine(
     echo=False,
     future=True,
 )
+
+
+@event.listens_for(engine, "connect")
+def set_business_timezone(dbapi_connection, _connection_record) -> None:
+    """让数据库连接里的 CURRENT_TIMESTAMP/now() 也使用业务时区。"""
+    cursor = dbapi_connection.cursor()
+    try:
+        if engine.dialect.name == "postgresql":
+            cursor.execute("SET TIME ZONE %s", (settings.BUSINESS_TIMEZONE,))
+        elif engine.dialect.name in {"mysql", "mariadb"}:
+            cursor.execute("SET time_zone = %s", (business_utc_offset(),))
+    finally:
+        cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -35,6 +49,9 @@ _LEGACY_COLUMN_DDL: dict[str, list[tuple[str, str]]] = {
         ("last_visit_time", "TIMESTAMP WITH TIME ZONE"),
         ("last_active_time", "TIMESTAMP WITH TIME ZONE"),
         ("last_offline_time", "TIMESTAMP WITH TIME ZONE"),
+        ("wechat_openid", "VARCHAR(100)"),
+        ("wechat_unionid", "VARCHAR(100)"),
+        ("wechat_bound_at", "TIMESTAMP WITH TIME ZONE"),
     ],
     "tasks": [
         ("node_output", "TEXT"),
@@ -126,6 +143,43 @@ def ensure_runtime_schema() -> None:
                         "WHERE last_edited_at IS NULL"
                     )
                 )
+
+    # 1.05) 微信小程序绑定索引
+    if (
+        inspector.has_table("users")
+        and _column_exists(inspector, "users", "wechat_openid")
+        and not _index_exists(inspector, "users", "ix_users_wechat_openid")
+    ):
+        with engine.begin() as conn:
+            if _dialect_name() == "postgresql":
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_wechat_openid "
+                        "ON users (wechat_openid)"
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX ix_users_wechat_openid "
+                        "ON users (wechat_openid)"
+                    )
+                )
+    if (
+        inspector.has_table("users")
+        and _column_exists(inspector, "users", "wechat_unionid")
+        and not _index_exists(inspector, "users", "ix_users_wechat_unionid")
+    ):
+        with engine.begin() as conn:
+            if _dialect_name() == "postgresql":
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_users_wechat_unionid "
+                        "ON users (wechat_unionid)"
+                    )
+                )
+            else:
+                conn.execute(text("CREATE INDEX ix_users_wechat_unionid ON users (wechat_unionid)"))
 
     # 1.1) 周期任务生成防重索引
     if (

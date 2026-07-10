@@ -9,11 +9,11 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from jose import JWTError, jwt
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, timezone
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.timezone import business_now, to_business_time
 from app.models.models import User, normalize_role, ROLE_ADMIN
 from app.schemas.schemas import UserCreate, UserManageCreate, UserManageUpdate, UserResponse, TokenResponse
 
@@ -21,17 +21,10 @@ router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 ONLINE_TIMEOUT_SECONDS = 90
-BUSINESS_TZ = ZoneInfo(settings.BUSINESS_TIMEZONE)
-
-
-def business_now():
-    return datetime.now(BUSINESS_TZ).replace(tzinfo=None)
 
 
 def _naive(value: datetime | None):
-    if value is None:
-        return None
-    return value.replace(tzinfo=None)
+    return to_business_time(value)
 
 
 def _mark_online(db: Session, user: User, commit: bool = True):
@@ -64,7 +57,7 @@ def _normalize_presence(user: User, now: datetime | None = None) -> bool:
         return False
     user.is_online = False
     user.last_offline_time = (
-        user.last_active_time + timedelta(seconds=ONLINE_TIMEOUT_SECONDS)
+        last_active + timedelta(seconds=ONLINE_TIMEOUT_SECONDS)
         if user.last_active_time
         else now
     )
@@ -74,6 +67,15 @@ def _normalize_presence(user: User, now: datetime | None = None) -> bool:
 def _update_last_active_time(db: Session, user: User):
     """更新用户最后活跃时间（本地时区）"""
     _mark_online(db, user)
+
+
+def build_user_response(user: User):
+    item = UserResponse.model_validate(user)
+    item.created_at = to_business_time(user.created_at)
+    item.last_visit_time = to_business_time(user.last_visit_time)
+    item.last_active_time = to_business_time(user.last_active_time)
+    item.last_offline_time = to_business_time(user.last_offline_time)
+    return item
 
 
 def _clean_optional(value: str | None):
@@ -148,7 +150,9 @@ def migrate_password_hash(user: User, plain_password: str, hashed: str, db: Sess
 
 def create_access_token(data: dict, expires_delta=None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(timezone.utc) + (
+        expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -201,7 +205,7 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
         access_token = create_access_token(data={"sub": str(existing.id)})
         return TokenResponse(
             access_token=access_token,
-            user=UserResponse.model_validate(existing)
+            user=build_user_response(existing)
         )
     user = User(
         username=username,
@@ -217,7 +221,7 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
     access_token = create_access_token(data={"sub": str(user.id)})
     return TokenResponse(
         access_token=access_token,
-        user=UserResponse.model_validate(user)
+        user=build_user_response(user)
     )
 
 
@@ -247,24 +251,24 @@ def login(data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     access_token = create_access_token(data={"sub": str(user.id)})
     return TokenResponse(
         access_token=access_token,
-        user=UserResponse.model_validate(user)
+        user=build_user_response(user)
     )
 
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
-    return current_user
+    return build_user_response(current_user)
 
 
 @router.post("/presence/heartbeat", response_model=UserResponse)
 def presence_heartbeat(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return _mark_online(db, current_user)
+    return build_user_response(_mark_online(db, current_user))
 
 
 @router.post("/presence/offline")
 def presence_offline(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _mark_offline(db, current_user)
-    return {"ok": True, "last_offline_time": current_user.last_offline_time}
+    return {"ok": True, "last_offline_time": to_business_time(current_user.last_offline_time)}
 
 
 @router.get("/users", response_model=list[UserResponse])
@@ -276,7 +280,7 @@ def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_c
         db.commit()
         for user in users:
             db.refresh(user)
-    return users
+    return [build_user_response(user) for user in users]
 
 
 @router.post("/users", response_model=UserResponse)
@@ -306,7 +310,7 @@ def create_user(data: UserManageCreate, db: Session = Depends(get_db), current_u
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
+    return build_user_response(user)
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)
@@ -342,7 +346,7 @@ def update_user(user_id: int, data: UserManageUpdate, db: Session = Depends(get_
 
     db.commit()
     db.refresh(user)
-    return user
+    return build_user_response(user)
 
 
 @router.delete("/users/{user_id}")

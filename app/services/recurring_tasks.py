@@ -5,18 +5,11 @@
 """
 import json
 from datetime import date, datetime, time, timedelta
-from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
+from app.core.timezone import business_today
 from app.models.models import RecurringTaskRule, Task, TaskColumn
-
-BUSINESS_TZ = ZoneInfo(settings.BUSINESS_TIMEZONE)
-
-
-def business_today() -> date:
-    return datetime.now(BUSINESS_TZ).date()
 
 
 def parse_due_time(value: str | None) -> time | None:

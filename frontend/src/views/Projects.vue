@@ -43,9 +43,22 @@
           </div>
         </div>
 
-        <div style="margin-top: 18px; display: flex; justify-content: space-between; align-items: center">
-          <span class="muted">创建于 {{ formatDate(project.created_at) }}</span>
-          <el-tag effect="light">{{ project.task_count || 0 }} 个任务</el-tag>
+        <div class="project-footer">
+          <div class="project-assignees">
+            <span class="project-assignees-label">未完成负责人</span>
+            <div v-if="projectOpenAssignees(project).length" class="project-assignee-list">
+              <span
+                v-for="user in projectOpenAssignees(project)"
+                :key="user.id"
+                class="project-assignee-chip"
+                :style="{ background: `${user.color || '#93c5fd'}33` }"
+              >
+                {{ user.name }}
+              </span>
+            </div>
+            <span v-else class="muted">暂无未完成负责人</span>
+          </div>
+          <el-tag effect="light">{{ projectTaskCount(project) }} 个任务</el-tag>
         </div>
       </div>
     </div>
@@ -69,7 +82,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
@@ -85,6 +97,7 @@ const editingProjectId = ref(null)
 const form = reactive({ name: '', description: '' })
 const projects = ref([])
 const projectStatsById = ref({})
+const projectAssigneesById = ref({})
 const statusPalette = [
   { label: '待处理', key: 'pending_count', color: '#64748b', tint: 'rgba(148, 163, 184, 0.16)', ring: 'rgba(148, 163, 184, 0.28)' },
   { label: '进行中', key: 'in_progress_count', color: '#2563eb', tint: 'rgba(59, 130, 246, 0.14)', ring: 'rgba(59, 130, 246, 0.24)' },
@@ -111,6 +124,7 @@ async function refreshProjects() {
         done_count: 0,
         task_count: 0
       }
+      const assigneeMap = new Map()
       ;(columns || []).forEach(column => {
         const count = column.tasks?.length || 0
         stats.task_count += count
@@ -118,11 +132,24 @@ async function refreshProjects() {
         if (column.name === '进行中') stats.in_progress_count = count
         if (column.name === '待验收') stats.review_count = count
         if (column.name === '已完成') stats.done_count = count
+        if (column.name !== '已完成') {
+          ;(column.tasks || []).forEach(task => {
+            const assignee = task.assignee
+            const assigneeId = task.assignee_id || assignee?.id
+            if (!assigneeId || assigneeMap.has(assigneeId)) return
+            assigneeMap.set(assigneeId, {
+              id: assigneeId,
+              name: assignee?.display_name || assignee?.username || `成员 #${assigneeId}`,
+              color: assignee?.color || '#93c5fd'
+            })
+          })
+        }
       })
-      return [project.id, stats]
+      return [project.id, { stats, assignees: Array.from(assigneeMap.values()) }]
     })
   )
-  projectStatsById.value = Object.fromEntries(statsEntries)
+  projectStatsById.value = Object.fromEntries(statsEntries.map(([projectId, value]) => [projectId, value.stats]))
+  projectAssigneesById.value = Object.fromEntries(statsEntries.map(([projectId, value]) => [projectId, value.assignees]))
   projects.value = projectList
 }
 
@@ -194,8 +221,13 @@ function projectStatusItems(project) {
   }))
 }
 
-function formatDate(value) {
-  return value ? dayjs(value).format('YYYY-MM-DD') : '--'
+function projectTaskCount(project) {
+  const stats = projectStatsById.value[project.id] || {}
+  return stats.task_count ?? project?.task_count ?? 0
+}
+
+function projectOpenAssignees(project) {
+  return projectAssigneesById.value[project.id] || []
 }
 </script>
 
@@ -228,6 +260,47 @@ function formatDate(value) {
   line-height: 1;
 }
 
+.project-footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.project-assignees {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.project-assignees-label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.project-assignee-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.project-assignee-chip {
+  display: inline-flex;
+  max-width: 120px;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 480px) {
   .project-grid {
     grid-template-columns: 1fr !important;
@@ -241,6 +314,10 @@ function formatDate(value) {
   }
   .project-stat-value {
     font-size: 18px;
+  }
+  .project-footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

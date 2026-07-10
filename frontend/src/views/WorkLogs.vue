@@ -14,7 +14,7 @@
     </template>
 
     <div class="log-shell">
-      <!-- 写日志 -->
+      <!-- 写工作日志 -->
       <section class="log-compose panel">
         <div class="compose-header">
           <div class="compose-date">
@@ -35,7 +35,7 @@
           <div class="compose-footer">
             <span class="compose-hint">同一天可多次提交，自动覆盖</span>
             <el-button type="primary" :loading="saving" @click="submitLog">
-              {{ myTodayLog ? '更新日志' : '提交日志' }}
+              {{ myTodayLog ? '更新工作日志' : '提交工作日志' }}
             </el-button>
           </div>
           <!-- 成员筛选 -->
@@ -64,10 +64,10 @@
         </div>
       </section>
 
-      <!-- 历史日志列表 -->
+      <!-- 历史工作日志列表 -->
       <section class="log-history">
         <div v-if="loading && filteredLogs.length === 0" class="empty-card">加载中...</div>
-        <div v-else-if="filteredLogs.length === 0" class="empty-card">还没有日志，开始写第一条吧。</div>
+        <div v-else-if="filteredLogs.length === 0" class="empty-card">还没有工作日志，开始写第一条吧。</div>
         <div v-else class="log-list">
           <div v-for="log in filteredLogs" :key="log.id" class="log-card">
             <div class="log-card-header">
@@ -91,7 +91,7 @@
     </div>
 
     <!-- 编辑 Dialog -->
-    <el-dialog v-model="editDialog" title="编辑日志" width="600px">
+    <el-dialog v-model="editDialog" title="编辑工作日志" width="600px">
       <el-input
         v-model="editForm.content"
         type="textarea"
@@ -107,12 +107,12 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
 import { isUserOnline, userPresenceText, userPresenceTitle } from '@/utils/presence'
+import { businessNowPayload, businessTodayText, formatBusinessTime } from '@/utils/time'
 
 const auth = useAuthStore()
 const loading = ref(false)
@@ -121,18 +121,18 @@ const logs = ref([])
 const members = ref([])
 const selectedUserId = ref(null)
 let membersRefreshTimer = null
-const filterDate = ref(dayjs().format('YYYY-MM-DD'))
+const filterDate = ref(businessTodayText())
 const editDialog = ref(false)
 const editingLog = ref(null)
 
 const form = reactive({ content: '' })
 const editForm = reactive({ content: '' })
 
-const todayLabel = computed(() => dayjs().format('YYYY-MM-DD'))
+const todayLabel = computed(() => businessTodayText())
 
 const myTodayLog = computed(() => {
   return logs.value.find(
-    log => log.user_id === auth.user?.id && log.log_date && dayjs(log.log_date).format('YYYY-MM-DD') === todayLabel.value
+    log => log.user_id === auth.user?.id && log.log_date && formatBusinessTime(log.log_date, 'YYYY-MM-DD') === todayLabel.value
   )
 })
 
@@ -167,7 +167,7 @@ async function loadLogs() {
     }
   } catch (error) {
     console.error(error)
-    ElMessage.error('日志加载失败')
+    ElMessage.error('工作日志加载失败')
   } finally {
     loading.value = false
   }
@@ -183,17 +183,17 @@ async function loadMembers(silent = false) {
 
 async function submitLog() {
   if (!form.content.trim()) {
-    ElMessage.warning('日志内容不能为空')
+    ElMessage.warning('工作日志内容不能为空')
     return
   }
   saving.value = true
   try {
     const payload = {
-      log_date: dayjs().format('YYYY-MM-DDTHH:mm:ss'),
+      log_date: businessNowPayload(),
       content: form.content.trim()
     }
     await api.post('/worklogs', payload)
-    ElMessage.success('日志已保存')
+    ElMessage.success('工作日志已保存')
     await loadLogs()
   } catch (error) {
     const detail = error?.response?.data?.detail
@@ -211,7 +211,7 @@ function startEdit(log) {
 
 async function saveEdit() {
   if (!editForm.content.trim()) {
-    ElMessage.warning('日志内容不能为空')
+    ElMessage.warning('工作日志内容不能为空')
     return
   }
   saving.value = true
@@ -219,7 +219,7 @@ async function saveEdit() {
     await api.put(`/worklogs/${editingLog.value.id}`, {
       content: editForm.content.trim()
     })
-    ElMessage.success('日志已更新')
+    ElMessage.success('工作日志已更新')
     editDialog.value = false
     await loadLogs()
   } catch (error) {
@@ -232,13 +232,13 @@ async function saveEdit() {
 
 async function deleteLog(log) {
   try {
-    await ElMessageBox.confirm('确定删除这条日志吗？', '删除日志', {
+    await ElMessageBox.confirm('确定删除这条工作日志吗？', '删除工作日志', {
       type: 'warning',
       confirmButtonText: '删除',
       cancelButtonText: '取消'
     })
     await api.delete(`/worklogs/${log.id}`)
-    ElMessage.success('日志已删除')
+    ElMessage.success('工作日志已删除')
     await loadLogs()
   } catch (error) {
     if (error === 'cancel' || error === 'close') return
@@ -248,7 +248,7 @@ async function deleteLog(log) {
 }
 
 function formatDate(value) {
-  return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '--'
+  return formatBusinessTime(value)
 }
 </script>
 

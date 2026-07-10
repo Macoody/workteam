@@ -61,6 +61,24 @@ class TokenResponse(BaseModel):
     user: UserResponse
 
 
+class WechatLoginRequest(BaseModel):
+    code: Optional[str] = None
+    dev_openid: Optional[str] = None
+
+
+class WechatBindRequest(WechatLoginRequest):
+    username: str
+    password: str
+
+
+class WechatLoginResponse(BaseModel):
+    bound: bool
+    access_token: Optional[str] = None
+    token_type: str = "bearer"
+    user: Optional[UserResponse] = None
+    message: Optional[str] = None
+
+
 # === 项目 ===
 class ProjectCreate(BaseModel):
     name: str

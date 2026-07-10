@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.core.database import get_db
+from app.core.timezone import to_business_time
 from app.models.models import User, Project, TaskColumn, Task, ROLE_ADMIN, normalize_role
 from app.schemas.schemas import ProjectCreate, ProjectUpdate, ProjectResponse
 from app.routers.auth import get_current_user
@@ -18,6 +19,12 @@ DEFAULT_KANBAN_COLUMNS = [
     {"name": "待验收", "order": 2, "color": "#f59e0b"},
     {"name": "已完成", "order": 3, "color": "#10b981"},
 ]
+
+
+def build_project_response(project: Project):
+    item = ProjectResponse.model_validate(project)
+    item.created_at = to_business_time(project.created_at)
+    return item
 
 
 def default_columns(project_id: int):
@@ -67,7 +74,7 @@ def list_projects(db: Session = Depends(get_db), current_user: User = Depends(ge
                 column_name = column_name_by_id.get(task.column_id)
                 if column_name in status_counts:
                     status_counts[column_name] += 1
-        r = ProjectResponse.model_validate(p)
+        r = build_project_response(p)
         r.task_count = sum(status_counts.values())
         r.pending_count = status_counts["待处理"]
         r.in_progress_count = status_counts["进行中"]
@@ -91,7 +98,7 @@ def create_project(data: ProjectCreate, db: Session = Depends(get_db), current_u
     # 创建默认看板列
     ensure_default_columns(db, project.id)
     
-    return project
+    return build_project_response(project)
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
@@ -99,7 +106,7 @@ def get_project(project_id: int, db: Session = Depends(get_db), current_user: Us
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
-    return project
+    return build_project_response(project)
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
@@ -117,7 +124,7 @@ def update_project(project_id: int, data: ProjectUpdate, db: Session = Depends(g
         project.description = data.description
     db.commit()
     db.refresh(project)
-    return project
+    return build_project_response(project)
 
 
 @router.delete("/{project_id}")

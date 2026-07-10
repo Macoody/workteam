@@ -1,0 +1,36 @@
+<view class="page login-page">
+  <view class="brand">
+    <view class="brand-mark">徐</view>
+    <view>
+      <view class="brand-title">徐东摆地摊</view>
+      <view class="brand-subtitle">手机任务中心</view>
+    </view>
+  </view>
+
+  <view class="panel login-card">
+    <view class="card-title">登录任务中心</view>
+    <button class="primary-button" loading="{{wechatLoading}}" bindtap="wechatLogin">微信登录</button>
+
+    <view class="divider">
+      <text></text>
+      <view>或</view>
+      <text></text>
+    </view>
+
+    <view class="form-field">
+      <text>用户名</text>
+      <input value="{{username}}" data-field="username" bindinput="handleInput" placeholder="输入系统账号" />
+    </view>
+    <view class="form-field">
+      <text>密码</text>
+      <input password value="{{password}}" data-field="password" bindinput="handleInput" placeholder="输入密码" />
+    </view>
+
+    <button class="ghost-button" loading="{{accountLoading}}" bindtap="accountLogin">账号登录</button>
+    <button class="bind-button" loading="{{bindLoading}}" bindtap="bindWechat">绑定微信并登录</button>
+
+    <view wx:if="{{message}}" class="login-message {{messageType}}">
+      {{message}}
+    </view>
+  </view>
+</view>

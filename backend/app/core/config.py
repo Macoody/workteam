@@ -48,6 +48,14 @@ class Settings:
     # 数据库统一存 TIMESTAMP WITH TIME ZONE，业务层假设写入时间为该时区
     BUSINESS_TIMEZONE: str = os.getenv("BUSINESS_TIMEZONE", "Asia/Shanghai")
 
+    # 微信小程序登录配置。正式上线前把 AppID/AppSecret 配到服务器环境变量中；
+    # 本地开发如需绕过微信 code2Session，可显式开启 WECHAT_DEV_LOGIN_ENABLED。
+    WECHAT_MINI_APP_ID: str = os.getenv("WECHAT_MINI_APP_ID", "")
+    WECHAT_MINI_APP_SECRET: str = os.getenv("WECHAT_MINI_APP_SECRET", "")
+    WECHAT_DEV_LOGIN_ENABLED: bool = os.getenv(
+        "WECHAT_DEV_LOGIN_ENABLED", "false"
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
     def validate(self) -> None:
         """启动时校验关键配置；失败则抛错，避免带病上线。"""
         if not self.DATABASE_URL:

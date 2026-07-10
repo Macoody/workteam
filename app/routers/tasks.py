@@ -9,15 +9,15 @@ import uuid
 import json
 import re
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.timezone import business_now, parse_datetime, to_business_time
 from app.models.models import (
     User, Task, TaskColumn, Attachment, Comment, CommentMention,
     Document, Project, RecurringTaskRule, ROLE_ADMIN, normalize_role
 )
-from app.routers.auth import _update_last_active_time
+from app.routers.auth import _update_last_active_time, build_user_response
 from app.schemas.schemas import (
     TaskCreate, TaskUpdate, TaskResponse,
     CommentCreate, CommentResponse, AttachmentResponse, MentionNotificationResponse,
@@ -31,11 +31,6 @@ router = APIRouter()
 
 UPLOAD_DIR = settings.UPLOAD_DIR
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-BUSINESS_TZ = ZoneInfo(settings.BUSINESS_TIMEZONE)
-
-
-def business_now():
-    return datetime.now(BUSINESS_TZ).replace(tzinfo=None)
 
 
 def allowed_file(filename: str) -> bool:
@@ -60,11 +55,11 @@ def normalize_delivery_dates(values):
         if not value:
             continue
         if isinstance(value, datetime):
-            result.append(value)
+            result.append(to_business_time(value))
             continue
         try:
-            result.append(datetime.fromisoformat(str(value)))
-        except ValueError:
+            result.append(to_business_time(parse_datetime(value)))
+        except (TypeError, ValueError):
             continue
     return result
 
@@ -81,11 +76,21 @@ def validate_linked_document(db: Session, project_id: int, document_id: int | No
 
 def build_task_response(task: Task):
     recent_comments = []
-    comments = sorted(task.comments or [], key=lambda item: item.created_at or datetime.min, reverse=True)[:2]
+    comments = sorted(
+        task.comments or [],
+        key=lambda item: to_business_time(item.created_at) or datetime.min,
+        reverse=True,
+    )[:2]
     for comment in comments:
         item = CommentResponse.model_validate(comment)
-        item.user = comment.user
+        item.user = build_user_response(comment.user) if comment.user else None
+        item.created_at = to_business_time(comment.created_at)
         recent_comments.append(item)
+    attachments = []
+    for attachment in task.attachments or []:
+        item = AttachmentResponse.model_validate(attachment)
+        item.uploaded_at = to_business_time(attachment.uploaded_at)
+        attachments.append(item)
     return TaskResponse(
         id=task.id,
         project_id=task.project_id,
@@ -97,18 +102,18 @@ def build_task_response(task: Task):
         node_output=task.node_output,
         linked_document_id=task.linked_document_id,
         assignee_id=task.assignee_id,
-        assignee=task.assignee,
-        due_date=task.due_date,
+        assignee=build_user_response(task.assignee) if task.assignee else None,
+        due_date=to_business_time(task.due_date),
         delivery_dates=normalize_delivery_dates(parse_json_list(task.delivery_dates)),
         completed_by=parse_json_list(task.completed_by),
-        completed_at=task.completed_at,
+        completed_at=to_business_time(task.completed_at),
         tags=parse_json_list(task.tags),
         recurrence_rule_id=task.recurrence_rule_id,
         recurrence_occurrence_date=task.recurrence_occurrence_date,
         order=task.order,
-        created_at=task.created_at,
-        updated_at=task.updated_at,
-        attachments=task.attachments or [],
+        created_at=to_business_time(task.created_at),
+        updated_at=to_business_time(task.updated_at),
+        attachments=attachments,
         recent_comments=recent_comments,
     )
 
@@ -143,8 +148,8 @@ def build_mention_notification(mention: CommentMention):
         task_title=task.title if task else "任务",
         project_name=project.name if project else None,
         comment_content=mention.comment.content if mention.comment else "",
-        mentioned_by=mention.comment.user if mention.comment else None,
-        created_at=mention.created_at,
+        mentioned_by=build_user_response(mention.comment.user) if mention.comment and mention.comment.user else None,
+        created_at=to_business_time(mention.created_at),
         is_read=bool(mention.is_read),
     )
 
@@ -194,12 +199,13 @@ def create_task(data: TaskCreate, db: Session = Depends(get_db), current_user: U
         raise HTTPException(status_code=400, detail="任务项目和看板列不匹配")
     validate_linked_document(db, data.project_id, data.linked_document_id)
 
+    due_date = to_business_time(data.due_date)
     delivery_dates = normalize_delivery_dates(data.delivery_dates)
-    if data.due_date:
+    if due_date:
         if not delivery_dates:
-            delivery_dates = [data.due_date]
-        elif data.due_date.isoformat() != delivery_dates[0].isoformat():
-            delivery_dates = [data.due_date, *delivery_dates[:4]]
+            delivery_dates = [due_date]
+        elif due_date.isoformat() != delivery_dates[0].isoformat():
+            delivery_dates = [due_date, *delivery_dates[:4]]
     
     task = Task(
         project_id=data.project_id,
@@ -209,7 +215,7 @@ def create_task(data: TaskCreate, db: Session = Depends(get_db), current_user: U
         node_output=data.node_output,
         linked_document_id=data.linked_document_id,
         assignee_id=data.assignee_id,
-        due_date=data.due_date,
+        due_date=due_date,
         delivery_dates=json.dumps([item.isoformat() for item in delivery_dates]) if delivery_dates else None,
         tags=json.dumps(data.tags) if data.tags else None,
         completed_by=json.dumps([]),
@@ -315,7 +321,8 @@ def update_task(task_id: int, data: TaskUpdate, db: Session = Depends(get_db), c
     if "linked_document_id" in update_data:
         validate_linked_document(db, target_project_id, update_data.get("linked_document_id"))
     if "due_date" in update_data and update_data["due_date"] is not None:
-        if task.due_date and update_data["due_date"] != task.due_date:
+        update_data["due_date"] = to_business_time(update_data["due_date"])
+        if task.due_date and update_data["due_date"] != to_business_time(task.due_date):
             raise HTTPException(status_code=400, detail="交付时间已锁定，请使用延期功能")
         if not task.due_date:
             delivery_dates = normalize_delivery_dates(parse_json_list(task.delivery_dates))
@@ -357,8 +364,8 @@ def extend_delivery(task_id: int, payload: dict, db: Session = Depends(get_db), 
     if not value:
         raise HTTPException(status_code=400, detail="请选择新的交付时间")
     try:
-        new_date = datetime.fromisoformat(value)
-    except ValueError:
+        new_date = to_business_time(parse_datetime(value))
+    except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="交付时间格式错误")
 
     delivery_dates = normalize_delivery_dates(parse_json_list(task.delivery_dates))
@@ -455,12 +462,20 @@ async def upload_attachment(task_id: int, file: UploadFile = File(...), db: Sess
     db.add(attachment)
     db.commit()
     db.refresh(attachment)
-    return attachment
+    item = AttachmentResponse.model_validate(attachment)
+    item.uploaded_at = to_business_time(attachment.uploaded_at)
+    return item
 
 
 @router.get("/{task_id}/attachments", response_model=list[AttachmentResponse])
 def list_attachments(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return db.query(Attachment).filter(Attachment.task_id == task_id).all()
+    attachments = db.query(Attachment).filter(Attachment.task_id == task_id).all()
+    result = []
+    for attachment in attachments:
+        item = AttachmentResponse.model_validate(attachment)
+        item.uploaded_at = to_business_time(attachment.uploaded_at)
+        result.append(item)
+    return result
 
 
 @router.delete("/{task_id}/attachments/{attachment_id}")
@@ -486,7 +501,8 @@ def list_comments(task_id: int, db: Session = Depends(get_db), current_user: Use
     result = []
     for c in comments:
         r = CommentResponse.model_validate(c)
-        r.user = c.user
+        r.user = build_user_response(c.user) if c.user else None
+        r.created_at = to_business_time(c.created_at)
         result.append(r)
     return result
 
@@ -539,5 +555,6 @@ def create_comment(task_id: int, data: CommentCreate, db: Session = Depends(get_
         db.commit()
     
     r = CommentResponse.model_validate(comment)
-    r.user = current_user
+    r.user = build_user_response(current_user)
+    r.created_at = to_business_time(comment.created_at)
     return r

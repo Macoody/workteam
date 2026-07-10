@@ -8,10 +8,10 @@ from sqlalchemy.orm import joinedload
 import os
 import uuid
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.timezone import business_now, to_business_time
 from app.models.models import (
     User, Document, DocumentActivityLog, Folder, FileAsset, ROLE_ADMIN, normalize_role
 )
@@ -19,14 +19,18 @@ from app.schemas.schemas import (
     DocumentActivityResponse, DocumentCreate, DocumentUpdate, DocumentResponse,
     FolderCreate, FolderResponse, FileAssetResponse
 )
-from app.routers.auth import get_current_user, require_admin, _update_last_active_time
+from app.routers.auth import (
+    build_user_response,
+    get_current_user,
+    require_admin,
+    _update_last_active_time,
+)
 
 router = APIRouter()
 UPLOAD_DIR = os.path.join(settings.UPLOAD_DIR, "documents")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_DOC_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "png", "jpg", "jpeg", "gif", "zip", "rar"]
-BUSINESS_TZ = ZoneInfo(settings.BUSINESS_TIMEZONE)
 DOCUMENT_ACTION_CREATE = "create"
 DOCUMENT_ACTION_VIEW = "view"
 DOCUMENT_ACTION_EDIT = "edit"
@@ -41,18 +45,6 @@ def document_query(db: Session):
     )
 
 
-def business_now():
-    return datetime.now(BUSINESS_TZ)
-
-
-def to_business_time(value):
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value.replace(tzinfo=BUSINESS_TZ)
-    return value.astimezone(BUSINESS_TZ)
-
-
 def timestamp_close(left, right) -> bool:
     if not left or not right:
         return False
@@ -63,6 +55,8 @@ def timestamp_close(left, right) -> bool:
 
 def build_document_response(doc: Document):
     item = DocumentResponse.model_validate(doc)
+    item.creator = build_user_response(doc.creator) if doc.creator else None
+    item.last_editor = build_user_response(doc.last_editor) if doc.last_editor else None
     item.created_at = to_business_time(doc.created_at)
     item.updated_at = to_business_time(doc.updated_at)
     item.last_edited_at = to_business_time(doc.last_edited_at)
@@ -71,7 +65,20 @@ def build_document_response(doc: Document):
 
 def build_activity_response(activity: DocumentActivityLog):
     item = DocumentActivityResponse.model_validate(activity)
+    item.user = build_user_response(activity.user) if activity.user else None
     item.created_at = to_business_time(activity.created_at)
+    return item
+
+
+def build_folder_response(folder: Folder):
+    item = FolderResponse.model_validate(folder)
+    item.created_at = to_business_time(folder.created_at)
+    return item
+
+
+def build_file_asset_response(asset: FileAsset):
+    item = FileAssetResponse.model_validate(asset)
+    item.created_at = to_business_time(asset.created_at)
     return item
 
 
@@ -315,13 +322,14 @@ def view_shared_document(token: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="文档不存在或链接已失效")
     if doc.share_expire and to_business_time(doc.share_expire) < business_now():
         raise HTTPException(status_code=410, detail="分享链接已过期")
-    return doc
+    return build_document_response(doc)
 
 
 # === 文件夹 ===
 @router.get("/folders/all", response_model=list[FolderResponse])
 def list_folders(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return db.query(Folder).filter(Folder.owner_id == current_user.id).all()
+    folders = db.query(Folder).filter(Folder.owner_id == current_user.id).all()
+    return [build_folder_response(folder) for folder in folders]
 
 
 @router.post("/folders", response_model=FolderResponse)
@@ -330,7 +338,7 @@ def create_folder(data: FolderCreate, db: Session = Depends(get_db), current_use
     db.add(folder)
     db.commit()
     db.refresh(folder)
-    return folder
+    return build_folder_response(folder)
 
 
 @router.delete("/folders/{folder_id}")
@@ -371,9 +379,10 @@ async def upload_asset(file: UploadFile = File(...), db: Session = Depends(get_d
     db.add(asset)
     db.commit()
     db.refresh(asset)
-    return asset
+    return build_file_asset_response(asset)
 
 
 @router.get("/assets", response_model=list[FileAssetResponse])
 def list_assets(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return db.query(FileAsset).order_by(FileAsset.created_at.desc()).limit(100).all()
+    assets = db.query(FileAsset).order_by(FileAsset.created_at.desc()).limit(100).all()
+    return [build_file_asset_response(asset) for asset in assets]

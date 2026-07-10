@@ -103,7 +103,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import dayjs from 'dayjs'
 import { useAuthStore } from '@/stores/auth'
 import { Editor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
@@ -113,6 +112,7 @@ import Highlight from '@tiptap/extension-highlight'
 import { ElMessage } from 'element-plus'
 import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
+import { businessNowPayload, formatBusinessTime } from '@/utils/time'
 
 const AUTO_SAVE_DELAY = 1500
 
@@ -203,7 +203,7 @@ async function autoSave() {
     })
     doc.value = updated
     await loadActivities()
-    saveStatusText.value = `已自动保存 ${dayjs().format('HH:mm:ss')}`
+    saveStatusText.value = `已自动保存 ${formatBusinessTime(businessNowPayload(), 'HH:mm:ss')}`
   } catch (error) {
     console.error(error)
     saveStatusText.value = '保存失败'
@@ -226,7 +226,7 @@ async function saveTitle() {
     doc.value = updated
     titleDraft.value = updated.title || title
     await loadActivities()
-    saveStatusText.value = `标题已保存 ${dayjs().format('HH:mm:ss')}`
+    saveStatusText.value = `标题已保存 ${formatBusinessTime(businessNowPayload(), 'HH:mm:ss')}`
     ElMessage.success('标题已保存')
   } catch (error) {
     ElMessage.error(error?.response?.data?.detail || '标题保存失败')
@@ -296,7 +296,7 @@ function documentEditedAt(item) {
 }
 
 function formatDate(value) {
-  return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '--'
+  return formatBusinessTime(value)
 }
 
 async function loadActivities() {

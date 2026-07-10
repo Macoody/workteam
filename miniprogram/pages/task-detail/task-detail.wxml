@@ -1,0 +1,36 @@
+<view class="page detail-page">
+  <view wx:if="{{loading}}" class="empty">加载中...</view>
+  <view wx:elif="{{!task}}" class="empty">任务不存在或已被删除。</view>
+  <view wx:else>
+    <view class="panel detail-card">
+      <view class="detail-head">
+        <view class="detail-title">{{task.title}}</view>
+        <text class="status {{task.statusClass}}">{{task.status}}</text>
+      </view>
+      <view class="meta-line">
+        <text>{{task.projectText}}</text>
+        <text wx:if="{{task.isRecurring}}" class="tag">周期</text>
+      </view>
+      <view wx:if="{{task.timeText}}" class="time-line">{{task.timeText}}</view>
+    </view>
+
+    <view class="panel section">
+      <view class="section-title">当前节点描述</view>
+      <view class="section-body">{{task.description || '暂无描述'}}</view>
+    </view>
+
+    <view class="panel section">
+      <view class="section-title">节点产出</view>
+      <view class="section-body">{{task.node_output || '暂无产出说明'}}</view>
+    </view>
+
+    <view wx:if="{{task.completed_at}}" class="panel section">
+      <view class="section-title">完成时间</view>
+      <view class="section-body">{{completedText}}</view>
+    </view>
+
+    <button wx:if="{{!task.isDone}}" class="primary-button action-button" loading="{{completing}}" bindtap="completeTask">
+      完成/打卡
+    </button>
+  </view>
+</view>

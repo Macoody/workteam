@@ -203,12 +203,17 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import dayjs from 'dayjs'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
 import { isUserOnline, userPresenceText, userPresenceTitle } from '@/utils/presence'
+import {
+  businessNowPickerDate,
+  formatBusinessTime,
+  toBusinessPayload,
+  toBusinessPickerDate
+} from '@/utils/time'
 
 const route = useRoute()
 const router = useRouter()
@@ -247,7 +252,7 @@ const newTask = reactive({
   linked_document_id: null,
   assignee_id: null,
   due_date: null,
-  recurrence_start_date: new Date(),
+  recurrence_start_date: businessNowPickerDate(),
   recurrence_end_date: null,
   recurrence_due_time: '23:59'
 })
@@ -325,7 +330,7 @@ async function openTask(task) {
   editForm.node_output = task.node_output || ''
   editForm.linked_document_id = task.linked_document_id || null
   editForm.assignee_id = task.assignee_id
-  editForm.due_date = task.due_date ? new Date(task.due_date) : null
+  editForm.due_date = toBusinessPickerDate(task.due_date)
   extensionDate.value = null
   showExtensionPicker.value = false
   comments.value = await api.get(`/tasks/${task.id}/comments`)
@@ -349,11 +354,11 @@ async function saveTask() {
       node_output: editForm.node_output,
       linked_document_id: editForm.linked_document_id,
       assignee_id: editForm.assignee_id,
-      due_date: editForm.due_date ? dayjs(editForm.due_date).toISOString() : null
+      due_date: toBusinessPayload(editForm.due_date)
     }
     const updated = await api.put(`/tasks/${currentTask.value.id}`, payload)
     currentTask.value = updated
-    editForm.due_date = updated.due_date ? new Date(updated.due_date) : null
+    editForm.due_date = toBusinessPickerDate(updated.due_date)
     ElMessage.success('保存成功')
     await loadKanban()
   } catch (error) {
@@ -370,10 +375,10 @@ async function extendTask() {
   }
   try {
     const updated = await api.post(`/tasks/${currentTask.value.id}/extend-delivery`, {
-      due_date: dayjs(extensionDate.value).toISOString()
+      due_date: toBusinessPayload(extensionDate.value)
     })
     currentTask.value = updated
-    editForm.due_date = updated.due_date
+    editForm.due_date = toBusinessPickerDate(updated.due_date)
     extensionDate.value = null
     showExtensionPicker.value = false
     ElMessage.success('已记录延期时间')
@@ -448,7 +453,7 @@ async function showAddTask() {
   newTask.linked_document_id = null
   newTask.assignee_id = null
   newTask.due_date = null
-  newTask.recurrence_start_date = new Date()
+  newTask.recurrence_start_date = businessNowPickerDate()
   newTask.recurrence_end_date = null
   newTask.recurrence_due_time = '23:59'
   addTaskDialog.value = true
@@ -479,8 +484,8 @@ async function createTask() {
         node_output: newTask.node_output,
         linked_document_id: newTask.linked_document_id,
         assignee_id: newTask.assignee_id,
-        start_date: dayjs(newTask.recurrence_start_date).format('YYYY-MM-DD'),
-        end_date: newTask.recurrence_end_date ? dayjs(newTask.recurrence_end_date).format('YYYY-MM-DD') : null,
+        start_date: toBusinessPayload(newTask.recurrence_start_date)?.slice(0, 10),
+        end_date: toBusinessPayload(newTask.recurrence_end_date)?.slice(0, 10) || null,
         due_time: newTask.recurrence_due_time || null,
         column_id: pendingColumnId,
         project_id: selectedProject.value
@@ -493,7 +498,7 @@ async function createTask() {
         node_output: newTask.node_output,
         linked_document_id: newTask.linked_document_id,
         assignee_id: newTask.assignee_id,
-        due_date: newTask.due_date ? dayjs(newTask.due_date).toISOString() : null,
+        due_date: toBusinessPayload(newTask.due_date),
         column_id: pendingColumnId,
         project_id: selectedProject.value
       })
@@ -519,7 +524,7 @@ async function claimTask() {
     const updated = await api.post(`/tasks/${taskId}/claim`)
     currentTask.value = updated
     editForm.assignee_id = updated.assignee_id
-    editForm.due_date = updated.due_date ? new Date(updated.due_date) : null
+    editForm.due_date = toBusinessPickerDate(updated.due_date)
     ElMessage.success('任务已领取，已移入进行中')
     await loadKanban()
   } catch (error) {
@@ -560,7 +565,7 @@ function taskTimeText(task) {
 }
 
 function formatDate(value) {
-  return value ? dayjs(value).format('MM-DD HH:mm') : '--'
+  return formatBusinessTime(value, 'MM-DD HH:mm')
 }
 </script>
 

@@ -142,12 +142,12 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-import dayjs from 'dayjs'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
 import { isUserOnline, userPresenceText, userPresenceTitle } from '@/utils/presence'
+import { businessTimeValue, formatBusinessTime, toBusinessPayload, toBusinessPickerDate } from '@/utils/time'
 
 const auth = useAuthStore()
 const loading = ref(false)
@@ -227,7 +227,7 @@ async function openEdit(task) {
   editForm.node_output = task.node_output || ''
   editForm.linked_document_id = task.linked_document_id || null
   editForm.assignee_id = task.assignee_id
-  editForm.due_date = task.due_date ? new Date(task.due_date) : null
+  editForm.due_date = toBusinessPickerDate(task.due_date)
   extensionDate.value = null
   showExtensionPicker.value = false
   await Promise.all([
@@ -288,11 +288,11 @@ async function saveTask() {
       node_output: editForm.node_output,
       linked_document_id: editForm.linked_document_id,
       assignee_id: editForm.assignee_id,
-      due_date: editForm.due_date ? dayjs(editForm.due_date).toISOString() : null
+      due_date: toBusinessPayload(editForm.due_date)
     }
     const updated = await api.put(`/tasks/${currentTask.value.id}`, payload)
     currentTask.value = updated
-    editForm.due_date = updated.due_date ? new Date(updated.due_date) : null
+    editForm.due_date = toBusinessPickerDate(updated.due_date)
     ElMessage.success('保存成功')
     editDialog.value = false
     await loadTasks()
@@ -311,11 +311,11 @@ async function extendTask() {
   }
   try {
     const updated = await api.post(`/tasks/${currentTask.value.id}/extend-delivery`, {
-      due_date: dayjs(extensionDate.value).toISOString()
+      due_date: toBusinessPayload(extensionDate.value)
     })
     currentTask.value = updated
     extensionDate.value = null
-    editForm.due_date = updated.due_date
+    editForm.due_date = toBusinessPickerDate(updated.due_date)
     showExtensionPicker.value = false
     ElMessage.success('已记录延期时间')
     await loadTasks()
@@ -387,14 +387,14 @@ function latestTaskTime(task) {
 
 function sortTasksByLatest(list) {
   return [...(list || [])].sort((left, right) => {
-    const rightTime = dayjs(latestTaskTime(right)).valueOf() || 0
-    const leftTime = dayjs(latestTaskTime(left)).valueOf() || 0
+    const rightTime = businessTimeValue(latestTaskTime(right))
+    const leftTime = businessTimeValue(latestTaskTime(left))
     return rightTime - leftTime || (right?.id || 0) - (left?.id || 0)
   })
 }
 
 function formatDate(value) {
-  return value ? dayjs(value).format('MM-DD HH:mm') : '--'
+  return formatBusinessTime(value, 'MM-DD HH:mm')
 }
 </script>
 

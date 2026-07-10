@@ -1,0 +1,16 @@
+{
+  "pages": [
+    "pages/tasks/tasks",
+    "pages/task-detail/task-detail",
+    "pages/login/login"
+  ],
+  "window": {
+    "navigationBarTitleText": "徐东摆地摊",
+    "navigationBarBackgroundColor": "#0f172a",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f6f8fb",
+    "backgroundTextStyle": "dark"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

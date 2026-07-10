@@ -1,0 +1,155 @@
+.tasks-page {
+  padding-bottom: 60rpx;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22rpx;
+}
+
+.hello {
+  font-size: 42rpx;
+  font-weight: 900;
+}
+
+.logout {
+  width: 120rpx;
+  height: 64rpx;
+  margin: 0;
+  border-radius: 999rpx;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 24rpx;
+  line-height: 64rpx;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+  margin-bottom: 22rpx;
+  padding: 28rpx;
+}
+
+.summary-number {
+  display: block;
+  font-size: 46rpx;
+  font-weight: 900;
+}
+
+.summary-label {
+  display: block;
+  margin-top: 6rpx;
+  color: #64748b;
+  font-size: 24rpx;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12rpx;
+  margin-bottom: 22rpx;
+}
+
+.tab {
+  height: 70rpx;
+  border-radius: 999rpx;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 26rpx;
+  line-height: 70rpx;
+}
+
+.tab.active {
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.task-list {
+  display: grid;
+  gap: 18rpx;
+}
+
+.task-card {
+  padding: 24rpx;
+}
+
+.task-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.task-title {
+  flex: 1;
+  font-size: 31rpx;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.tag {
+  display: inline-flex;
+  margin-left: 10rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: #ecfeff;
+  color: #0f766e;
+  font-size: 20rpx;
+  vertical-align: 4rpx;
+}
+
+.status {
+  flex: 0 0 auto;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.status.pending {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.status.doing {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.status.review {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.status.done {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.task-meta,
+.task-time,
+.task-desc {
+  margin-top: 12rpx;
+  color: #64748b;
+  font-size: 25rpx;
+  line-height: 1.45;
+}
+
+.task-desc {
+  color: #334155;
+}
+
+.complete-button {
+  height: 70rpx;
+  margin-top: 20rpx;
+  border-radius: 14rpx;
+  background: #14b8a6;
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 800;
+  line-height: 70rpx;
+}

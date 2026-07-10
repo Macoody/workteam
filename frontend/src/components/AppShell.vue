@@ -78,8 +78,8 @@ const navItems = [
   { to: '/members', label: '成员', icon: User },
   { to: '/tasks', label: '任务', icon: List },
   { to: '/documents', label: '文档', icon: Document },
-  { to: '/versions', label: '版本更新', icon: CollectionTag },
-  { to: '/logs', label: '日志', icon: Calendar }
+  { to: '/logs', label: '工作日志', icon: Calendar },
+  { to: '/versions', label: '版本更新', icon: CollectionTag }
 ]
 
 const roleMap = {

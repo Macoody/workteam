@@ -33,7 +33,14 @@
         </span>
         <span class="workbench-stat-copy">
           <span class="stat-label">{{ item.label }}</span>
-          <span class="stat-value">{{ item.value }}</span>
+          <span v-if="item.type === 'myTasks'" class="my-task-stat-split">
+            <span class="my-task-stat-open">
+              <span>未完成</span>
+              <strong>{{ myOpenTaskCount }}</strong>
+            </span>
+            <span class="my-task-stat-done">已完成 {{ myCompletedTaskCount }}</span>
+          </span>
+          <span v-else class="stat-value">{{ item.value }}</span>
           <span class="stat-footnote">{{ item.footnote }}</span>
         </span>
       </button>
@@ -43,7 +50,7 @@
       <div class="workbench-panel-header">
         <div>
           <h3 class="section-title">我的任务</h3>
-          <p>分配给我的所有任务</p>
+          <p>未完成 {{ myOpenTaskCount }} 个，已完成 {{ myCompletedTaskCount }} 个</p>
         </div>
         <el-button text type="primary" @click="go('/tasks')">任务列表</el-button>
       </div>
@@ -68,6 +75,7 @@
             <span class="item-meta">
               {{ resolveProjectName(task.project_id) }}
               <span v-if="taskTimeText(task)"> · {{ taskTimeText(task) }}</span>
+              <span v-if="isCompletionStatus(task)" class="completed-note"> · 已归档</span>
             </span>
           </span>
           <el-icon class="row-arrow"><ArrowRight /></el-icon>
@@ -217,13 +225,13 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import dayjs from 'dayjs'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { ArrowRight, Document, FolderOpened, List, Odometer } from '@element-plus/icons-vue'
 import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
 import { isUserOnline, userPresenceText, userPresenceTitle } from '@/utils/presence'
+import { businessTimeValue, formatBusinessTime } from '@/utils/time'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -240,7 +248,7 @@ let usersRefreshTimer = null
 const statCards = computed(() => [
   { label: '项目', value: stats.value.projects, footnote: '协作空间', to: '/projects', icon: FolderOpened },
   { label: '任务', value: stats.value.tasks, footnote: '全部事项', to: '/tasks', icon: List },
-  { label: '我的任务', value: stats.value.myTasks, footnote: '分配给我', to: '/tasks', icon: Odometer },
+  { label: '我的任务', type: 'myTasks', footnote: '优先处理未完成', to: '/tasks', icon: Odometer },
   { label: '文档', value: stats.value.documents, footnote: '资料沉淀', to: '/documents', icon: Document }
 ])
 const quickActions = [
@@ -252,16 +260,18 @@ const latestProjects = computed(() => projects.value.slice(0, 4))
 const latestDocuments = computed(() =>
   documents.value
     .slice()
-    .sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0))
+    .sort((a, b) => businessTimeValue(b.updated_at || b.created_at) - businessTimeValue(a.updated_at || a.created_at))
     .slice(0, 4)
 )
 const unreadMentionNotifications = computed(() => mentionNotifications.value.filter(item => !item.is_read))
+const myCompletedTaskCount = computed(() => myTaskList.value.filter(task => isCompletionStatus(task)).length)
+const myOpenTaskCount = computed(() => myTaskList.value.length - myCompletedTaskCount.value)
 const sortedMyTasks = computed(() =>
   myTaskList.value.slice().sort((a, b) => {
     const aDone = isCompletionStatus(a) ? 1 : 0
     const bDone = isCompletionStatus(b) ? 1 : 0
     if (aDone !== bDone) return aDone - bDone
-    return new Date(taskSortTime(b) || 0) - new Date(taskSortTime(a) || 0)
+    return businessTimeValue(taskSortTime(b)) - businessTimeValue(taskSortTime(a))
   })
 )
 
@@ -368,7 +378,7 @@ function taskSortTime(task) {
 }
 
 function formatDate(value) {
-  return value ? dayjs(value).format('MM-DD HH:mm') : '--'
+  return formatBusinessTime(value, 'MM-DD HH:mm')
 }
 
 function docTypeLabel(type) {
@@ -527,6 +537,34 @@ function goToKanban(projectId) {
   gap: 5px;
 }
 
+.my-task-stat-split {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  min-height: 38px;
+}
+
+.my-task-stat-open {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.my-task-stat-open strong {
+  font-size: 32px;
+  line-height: 0.95;
+}
+
+.my-task-stat-done {
+  padding-bottom: 3px;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .workbench-grid {
   display: grid;
   grid-template-columns: minmax(260px, 0.9fr) minmax(360px, 1.35fr) minmax(260px, 0.9fr);
@@ -551,12 +589,32 @@ function goToKanban(projectId) {
 }
 
 .my-task-row.task-completed {
-  background: rgba(241, 245, 249, 0.62);
-  color: #64748b;
+  min-height: 54px;
+  background: rgba(241, 245, 249, 0.48);
+  color: #94a3b8;
+}
+
+.my-task-row.task-completed .item-title,
+.my-task-row.task-completed .item-meta,
+.my-task-row.task-completed .row-arrow {
+  color: #94a3b8;
 }
 
 .my-task-row.task-completed .item-title {
+  font-size: 13px;
   text-decoration: line-through;
+}
+
+.my-task-row.task-completed .status-pill {
+  min-width: 64px;
+  padding: 5px 10px;
+  font-size: 11px;
+  opacity: 0.68;
+}
+
+.completed-note {
+  color: #94a3b8;
+  font-size: 12px;
 }
 
 .inline-tag {
@@ -839,6 +897,22 @@ function goToKanban(projectId) {
 
   .workbench-stat .stat-value {
     font-size: 24px;
+  }
+
+  .my-task-stat-split {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+  }
+
+  .my-task-stat-open strong {
+    font-size: 24px;
+  }
+
+  .my-task-stat-done {
+    padding-bottom: 0;
+    font-size: 11px;
   }
 
   .workbench-grid {

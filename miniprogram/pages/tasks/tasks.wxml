@@ -1,0 +1,51 @@
+<view class="page tasks-page">
+  <view class="topbar">
+    <view>
+      <view class="hello">我的任务</view>
+      <view class="muted">{{userName}}</view>
+    </view>
+    <button class="logout" bindtap="logout">退出</button>
+  </view>
+
+  <view class="summary panel">
+    <view>
+      <text class="summary-number">{{activeCount}}</text>
+      <text class="summary-label">待推进</text>
+    </view>
+    <view>
+      <text class="summary-number">{{doneCount}}</text>
+      <text class="summary-label">已完成/待验收</text>
+    </view>
+  </view>
+
+  <view class="tabs">
+    <button class="tab {{filter == 'active' ? 'active' : ''}}" data-filter="active" bindtap="setFilter">待推进</button>
+    <button class="tab {{filter == 'all' ? 'active' : ''}}" data-filter="all" bindtap="setFilter">全部</button>
+    <button class="tab {{filter == 'done' ? 'active' : ''}}" data-filter="done" bindtap="setFilter">已完成</button>
+  </view>
+
+  <view wx:if="{{loading}}" class="empty">加载中...</view>
+  <view wx:elif="{{displayTasks.length == 0}}" class="empty">这里暂时没有任务。</view>
+  <view wx:else class="task-list">
+    <view wx:for="{{displayTasks}}" wx:key="id" class="panel task-card" bindtap="openTask" data-id="{{item.id}}">
+      <view class="task-card-head">
+        <view class="task-title">
+          {{item.title}}
+          <text wx:if="{{item.isRecurring}}" class="tag">周期</text>
+        </view>
+        <text class="status {{item.statusClass}}">{{item.status}}</text>
+      </view>
+      <view class="task-meta">{{item.projectText}}</view>
+      <view wx:if="{{item.timeText}}" class="task-time">{{item.timeText}}</view>
+      <view wx:if="{{item.description}}" class="task-desc">{{item.description}}</view>
+      <button
+        wx:if="{{!item.isDone}}"
+        class="complete-button"
+        data-id="{{item.id}}"
+        catchtap="completeTask"
+      >
+        完成/打卡
+      </button>
+    </view>
+  </view>
+</view>

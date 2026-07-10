@@ -77,11 +77,11 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import dayjs from 'dayjs'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
+import { formatBusinessTime } from '@/utils/time'
 
 const auth = useAuthStore()
 const docs = ref([])
@@ -194,7 +194,7 @@ function documentEditedAt(doc) {
 }
 
 function formatDate(value) {
-  return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '--'
+  return formatBusinessTime(value)
 }
 </script>
 
