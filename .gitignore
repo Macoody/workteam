@@ -12,6 +12,9 @@ dist/
 # OS
 .DS_Store
 
+# 微信开发者工具本机配置
+miniprogram/project.private.config.json
+
 # 日志
 *.log
 

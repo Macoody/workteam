@@ -11,7 +11,7 @@
 ## 打开方式
 
 1. 用微信开发者工具打开 `miniprogram/` 目录。
-2. 没有正式 AppID 时，可以先使用 `touristappid` 预览页面和账号登录流程。
+2. 没有正式 AppID 时，导入项目时点击“测试号”，可以先预览页面和账号登录流程。
 3. 正式联调时，把 `project.config.json` 里的 `appid` 改成真实小程序 AppID。
 
 ## 后端配置
