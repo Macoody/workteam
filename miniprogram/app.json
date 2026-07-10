@@ -1,8 +1,8 @@
 {
   "pages": [
+    "pages/login/login",
     "pages/tasks/tasks",
-    "pages/task-detail/task-detail",
-    "pages/login/login"
+    "pages/task-detail/task-detail"
   ],
   "window": {
     "navigationBarTitleText": "徐东摆地摊",
