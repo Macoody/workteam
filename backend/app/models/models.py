@@ -213,6 +213,23 @@ class Document(Base):
     last_editor = relationship("User", foreign_keys=[last_editor_id])
 
 
+class DocumentActivityLog(Base):
+    __tablename__ = "document_activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(
+        Integer,
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    action = Column(String(20), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+
+    document = relationship("Document")
+    user = relationship("User")
+
+
 class Folder(Base):
     __tablename__ = "folders"
 

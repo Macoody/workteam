@@ -249,6 +249,18 @@ class DocumentResponse(BaseModel):
         from_attributes = True
 
 
+class DocumentActivityResponse(BaseModel):
+    id: int
+    document_id: int
+    user_id: int
+    user: Optional[UserResponse] = None
+    action: str
+    created_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
 # === 文件资产 ===
 class FileAssetResponse(BaseModel):
     id: int

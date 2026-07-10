@@ -12,8 +12,13 @@ from zoneinfo import ZoneInfo
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.models import User, Document, Folder, FileAsset, ROLE_ADMIN, normalize_role
-from app.schemas.schemas import DocumentCreate, DocumentUpdate, DocumentResponse, FolderCreate, FolderResponse, FileAssetResponse
+from app.models.models import (
+    User, Document, DocumentActivityLog, Folder, FileAsset, ROLE_ADMIN, normalize_role
+)
+from app.schemas.schemas import (
+    DocumentActivityResponse, DocumentCreate, DocumentUpdate, DocumentResponse,
+    FolderCreate, FolderResponse, FileAssetResponse
+)
 from app.routers.auth import get_current_user, require_admin, _update_last_active_time
 
 router = APIRouter()
@@ -22,6 +27,9 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_DOC_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "png", "jpg", "jpeg", "gif", "zip", "rar"]
 BUSINESS_TZ = ZoneInfo(settings.BUSINESS_TIMEZONE)
+DOCUMENT_ACTION_CREATE = "create"
+DOCUMENT_ACTION_VIEW = "view"
+DOCUMENT_ACTION_EDIT = "edit"
 
 
 # === 文档 CRUD ===
@@ -44,12 +52,75 @@ def to_business_time(value):
     return value.astimezone(BUSINESS_TZ)
 
 
+def timestamp_close(left, right) -> bool:
+    if not left or not right:
+        return False
+    if left.tzinfo is not None:
+        left = left.replace(tzinfo=None)
+    if right.tzinfo is not None:
+        right = right.replace(tzinfo=None)
+    return abs((left - right).total_seconds()) < 1
+
+
 def build_document_response(doc: Document):
     item = DocumentResponse.model_validate(doc)
     item.created_at = to_business_time(doc.created_at)
     item.updated_at = to_business_time(doc.updated_at)
     item.last_edited_at = to_business_time(doc.last_edited_at)
     return item
+
+
+def build_activity_response(activity: DocumentActivityLog):
+    item = DocumentActivityResponse.model_validate(activity)
+    item.created_at = to_business_time(activity.created_at)
+    return item
+
+
+def add_document_activity(
+    db: Session,
+    document_id: int,
+    user_id: int | None,
+    action: str,
+    created_at: datetime | None = None,
+):
+    if not user_id:
+        return None
+    activity = DocumentActivityLog(
+        document_id=document_id,
+        user_id=user_id,
+        action=action,
+        created_at=created_at or utc_now_naive(),
+    )
+    db.add(activity)
+    return activity
+
+
+def ensure_document_activity_seed(db: Session, doc: Document):
+    exists = db.query(DocumentActivityLog.id).filter(
+        DocumentActivityLog.document_id == doc.id
+    ).first()
+    if exists:
+        return
+    if doc.creator_id:
+        add_document_activity(
+            db,
+            doc.id,
+            doc.creator_id,
+            DOCUMENT_ACTION_CREATE,
+            doc.created_at or doc.last_edited_at or utc_now_naive(),
+        )
+    if doc.last_editor_id and doc.last_edited_at:
+        created_at = doc.created_at
+        same_initial_editor = doc.last_editor_id == doc.creator_id
+        same_initial_time = timestamp_close(doc.last_edited_at, created_at)
+        if not (same_initial_editor and same_initial_time):
+            add_document_activity(
+                db,
+                doc.id,
+                doc.last_editor_id,
+                DOCUMENT_ACTION_EDIT,
+                doc.last_edited_at,
+            )
 
 
 @router.get("", response_model=list[DocumentResponse])
@@ -89,6 +160,8 @@ def create_document(data: DocumentCreate, db: Session = Depends(get_db), current
         last_edited_at=now,
     )
     db.add(doc)
+    db.flush()
+    add_document_activity(db, doc.id, current_user.id, DOCUMENT_ACTION_CREATE, now)
     db.commit()
     _update_last_active_time(db, current_user)
     db.refresh(doc)
@@ -100,6 +173,7 @@ def get_document(doc_id: int, db: Session = Depends(get_db), current_user: User 
     doc = document_query(db).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在")
+    ensure_document_activity_seed(db, doc)
     db.execute(
         text(
             "UPDATE documents "
@@ -109,8 +183,27 @@ def get_document(doc_id: int, db: Session = Depends(get_db), current_user: User 
         {"doc_id": doc_id},
     )
     doc.view_count = (doc.view_count or 0) + 1
+    add_document_activity(db, doc.id, current_user.id, DOCUMENT_ACTION_VIEW)
     db.commit()
     return build_document_response(doc)
+
+
+@router.get("/{doc_id}/activities", response_model=list[DocumentActivityResponse])
+def list_document_activities(doc_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    ensure_document_activity_seed(db, doc)
+    db.commit()
+    activities = db.query(DocumentActivityLog).options(
+        joinedload(DocumentActivityLog.user)
+    ).filter(
+        DocumentActivityLog.document_id == doc_id
+    ).order_by(
+        DocumentActivityLog.created_at.desc(),
+        DocumentActivityLog.id.desc(),
+    ).all()
+    return [build_activity_response(activity) for activity in activities]
 
 
 @router.put("/{doc_id}", response_model=DocumentResponse)
@@ -120,16 +213,19 @@ def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="文档不存在")
     # 所有人可编辑任意文档（管理员可编辑全部）
     edited = False
-    if data.title is not None:
+    if data.title is not None and data.title != doc.title:
         doc.title = data.title
         edited = True
-    if data.content is not None:
+    if data.content is not None and data.content != doc.content:
         doc.content = data.content
         edited = True
     if edited:
+        ensure_document_activity_seed(db, doc)
+        now = utc_now_naive()
         doc.last_editor_id = current_user.id
         doc.last_editor = current_user
-        doc.last_edited_at = utc_now_naive()
+        doc.last_edited_at = now
+        add_document_activity(db, doc.id, current_user.id, DOCUMENT_ACTION_EDIT, now)
     db.commit()
     _update_last_active_time(db, current_user)
     db.refresh(doc)

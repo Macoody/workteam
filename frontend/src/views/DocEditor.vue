@@ -35,6 +35,26 @@
       </div>
     </div>
 
+    <section class="document-history panel">
+      <div class="history-header">
+        <div>
+          <h3 class="section-title">浏览和编辑历史</h3>
+          <p>记录成员进入文档、编辑文档的时间线。</p>
+        </div>
+        <el-button size="small" :loading="activitiesLoading" @click="loadActivities">刷新记录</el-button>
+      </div>
+      <div v-if="activities.length === 0" class="empty-card compact-history-empty">还没有历史记录。</div>
+      <div v-else class="history-list">
+        <div v-for="item in activities" :key="item.id" class="history-item">
+          <el-tag :type="activityTagType(item.action)" effect="light">{{ activityLabel(item.action) }}</el-tag>
+          <div class="history-main">
+            <div class="history-title">{{ activityUserName(item) }}</div>
+            <div class="history-time">{{ formatDate(item.created_at) }}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <el-dialog v-model="shareDialog" title="分享文档" width="420px">
       <div v-if="shareLink">
         <div class="muted">分享链接已生成</div>
@@ -84,6 +104,8 @@ const loading = ref(true)
 const doc = ref(null)
 const editor = ref(null)
 const saveStatusText = ref('已保存')
+const activities = ref([])
+const activitiesLoading = ref(false)
 let autoSaveTimer = null
 
 const shareDialog = ref(false)
@@ -108,6 +130,7 @@ onMounted(async () => {
     ])
     doc.value = currentDoc
     initEditor(doc.value?.content || '')
+    await loadActivities()
   } catch (error) {
     console.error(error)
     saveStatusText.value = '加载失败'
@@ -153,6 +176,7 @@ async function autoSave() {
       content: editor.value.getHTML()
     })
     doc.value = updated
+    await loadActivities()
     saveStatusText.value = `已自动保存 ${dayjs().format('HH:mm:ss')}`
   } catch (error) {
     console.error(error)
@@ -225,6 +249,38 @@ function formatDate(value) {
   return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '--'
 }
 
+async function loadActivities() {
+  const docId = doc.value?.id || route.params.id
+  if (!docId) return
+  activitiesLoading.value = true
+  try {
+    activities.value = await api.get(`/documents/${docId}/activities`)
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('历史记录加载失败')
+  } finally {
+    activitiesLoading.value = false
+  }
+}
+
+function activityLabel(action) {
+  if (action === 'view') return '浏览'
+  if (action === 'edit') return '编辑'
+  if (action === 'create') return '创建'
+  return '记录'
+}
+
+function activityTagType(action) {
+  if (action === 'edit') return 'warning'
+  if (action === 'create') return 'success'
+  return 'info'
+}
+
+function activityUserName(item) {
+  const user = item?.user
+  return user?.display_name || user?.username || '未知成员'
+}
+
 function shareDoc() {
   shareLink.value = doc.value?.share_token ? `${location.origin}/api/documents/shared/${doc.value.share_token}` : ''
   shareDialog.value = true
@@ -279,6 +335,60 @@ async function deleteDoc() {
   background: rgba(255, 255, 255, 0.86);
   color: #64748b;
   font-size: 12px;
+}
+
+.document-history {
+  margin-top: 18px;
+}
+
+.history-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.history-header p {
+  margin: -6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-main {
+  min-width: 0;
+}
+
+.history-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.history-time {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.compact-history-empty {
+  padding: 20px;
 }
 
 .tiptap-editor :deep(.editor-prosemirror) {
