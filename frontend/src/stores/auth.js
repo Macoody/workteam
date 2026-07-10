@@ -2,6 +2,24 @@ import { defineStore } from 'pinia'
 import api from '@/api'
 import router from '@/router'
 
+let presenceTimer = null
+let presenceListenersReady = false
+
+function authHeader() {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+function sendOfflineBeacon() {
+  const token = localStorage.getItem('token')
+  if (!token) return
+  fetch('/api/auth/presence/offline', {
+    method: 'POST',
+    headers: authHeader(),
+    keepalive: true
+  }).catch(() => {})
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: localStorage.getItem('token') || '',
@@ -11,13 +29,15 @@ export const useAuthStore = defineStore('auth', {
     async login(username, password) {
       // 后端 OAuth2PasswordRequestForm 需要 form-data 格式
       const params = new URLSearchParams()
-      params.append('username', username)
+      params.append('username', (username || '').trim())
       params.append('password', password)
       const data = await api.post('/auth/login', params, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       })
       this.token = data.access_token || data.token
+      this.user = data.user || null
       localStorage.setItem('token', this.token)
+      this.startPresence()
       return data
     },
     async register(data) {
@@ -25,9 +45,47 @@ export const useAuthStore = defineStore('auth', {
     },
     async getMe() {
       this.user = await api.get('/auth/me')
+      this.startPresence()
       return this.user
     },
-    logout() {
+    async heartbeatPresence() {
+      if (!this.token) return null
+      try {
+        this.user = await api.post('/auth/presence/heartbeat')
+        return this.user
+      } catch (error) {
+        console.error(error)
+        return null
+      }
+    },
+    startPresence() {
+      if (!this.token) return
+      if (!presenceTimer) {
+        this.heartbeatPresence()
+        presenceTimer = window.setInterval(() => {
+          this.heartbeatPresence()
+        }, 30000)
+      }
+      if (!presenceListenersReady) {
+        presenceListenersReady = true
+        window.addEventListener('beforeunload', sendOfflineBeacon)
+      }
+    },
+    async stopPresence() {
+      if (presenceTimer) {
+        window.clearInterval(presenceTimer)
+        presenceTimer = null
+      }
+      if (this.token) {
+        try {
+          await api.post('/auth/presence/offline')
+        } catch (error) {
+          console.error(error)
+        }
+      }
+    },
+    async logout() {
+      await this.stopPresence()
       this.token = ''
       this.user = null
       localStorage.removeItem('token')

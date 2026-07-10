@@ -10,7 +10,10 @@
         <el-table-column prop="display_name" label="成员" min-width="200">
           <template #default="{ row }">
             <div class="member-identity">
-              <span class="member-color-dot" :style="{ background: row.color || '#93c5fd' }"></span>
+              <span class="member-avatar-wrap">
+                <span class="member-color-dot" :style="{ background: row.color || '#93c5fd' }"></span>
+                <span class="member-online-dot" :class="{ online: isUserOnline(row) }"></span>
+              </span>
               <div>
                 <div class="item-title">{{ row.display_name || row.username }}</div>
                 <div class="item-meta">@{{ row.username }}</div>
@@ -31,6 +34,16 @@
         <el-table-column prop="phone" label="手机号" width="160">
           <template #default="{ row }">
             {{ row.phone || '--' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="在线状态" width="180">
+          <template #default="{ row }">
+            <div class="member-presence" :title="userPresenceTitle(row)">
+              <span class="presence-dot" :class="{ online: isUserOnline(row) }"></span>
+              <span :class="{ 'presence-online-text': isUserOnline(row), 'text-muted': !isUserOnline(row) }">
+                {{ userPresenceText(row) }}
+              </span>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="180">
@@ -114,13 +127,14 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
 import { USER_COLOR_OPTIONS } from '@/utils/userColors'
+import { isUserOnline, userPresenceText, userPresenceTitle } from '@/utils/presence'
 
 const auth = useAuthStore()
 const loading = ref(false)
@@ -128,6 +142,7 @@ const saving = ref(false)
 const showDialog = ref(false)
 const editingUserId = ref(null)
 const members = ref([])
+let membersRefreshTimer = null
 const form = reactive({
   username: '',
   display_name: '',
@@ -140,17 +155,27 @@ const form = reactive({
 onMounted(async () => {
   await auth.getMe()
   await loadMembers()
+  membersRefreshTimer = window.setInterval(() => {
+    loadMembers(true)
+  }, 30000)
 })
 
-async function loadMembers() {
-  loading.value = true
+onUnmounted(() => {
+  if (membersRefreshTimer) {
+    window.clearInterval(membersRefreshTimer)
+    membersRefreshTimer = null
+  }
+})
+
+async function loadMembers(silent = false) {
+  if (!silent) loading.value = true
   try {
     members.value = await api.get('/auth/users')
   } catch (error) {
     console.error(error)
-    ElMessage.error('成员列表加载失败')
+    if (!silent) ElMessage.error('成员列表加载失败')
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
@@ -254,6 +279,38 @@ function formatDate(value) {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9);
 }
 
+.member-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.member-online-dot {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.member-online-dot.online {
+  background: #22c55e;
+}
+
+.member-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.presence-online-text {
+  color: #15803d;
+  font-weight: 700;
+}
+
 .member-color-pill {
   display: inline-block;
   width: 46px;
@@ -284,5 +341,22 @@ function formatDate(value) {
 .text-muted {
   color: #999;
   font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .member-presence {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+  }
+
+  .member-color-pill {
+    width: 34px;
+  }
+
+  .color-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

@@ -45,9 +45,11 @@ class UserResponse(BaseModel):
     color: Optional[str]
     avatar: Optional[str]
     is_active: bool
+    is_online: bool = False
     created_at: Optional[datetime]
     last_visit_time: Optional[datetime]
     last_active_time: Optional[datetime]
+    last_offline_time: Optional[datetime]
 
     class Config:
         from_attributes = True

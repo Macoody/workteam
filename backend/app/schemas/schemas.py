@@ -11,8 +11,24 @@ class UserCreate(BaseModel):
     username: str
     password: str
     display_name: Optional[str] = None
-    email: Optional[str] = None
     phone: Optional[str] = None
+
+
+class UserManageCreate(BaseModel):
+    username: str
+    password: str
+    display_name: Optional[str] = None
+    phone: Optional[str] = None
+    role: str = "member"
+    color: str = "#93c5fd"
+
+
+class UserManageUpdate(BaseModel):
+    display_name: Optional[str] = None
+    phone: Optional[str] = None
+    role: Optional[str] = None
+    password: Optional[str] = None
+    color: Optional[str] = None
 
 
 class UserLogin(BaseModel):
@@ -24,12 +40,16 @@ class UserResponse(BaseModel):
     id: int
     username: str
     display_name: Optional[str]
-    email: Optional[str]
     phone: Optional[str]
     role: str
+    color: Optional[str]
     avatar: Optional[str]
     is_active: bool
+    is_online: bool = False
     created_at: Optional[datetime]
+    last_visit_time: Optional[datetime]
+    last_active_time: Optional[datetime]
+    last_offline_time: Optional[datetime]
 
     class Config:
         from_attributes = True
@@ -59,6 +79,10 @@ class ProjectResponse(BaseModel):
     owner_id: int
     created_at: Optional[datetime]
     task_count: Optional[int] = 0
+    pending_count: Optional[int] = 0
+    in_progress_count: Optional[int] = 0
+    review_count: Optional[int] = 0
+    done_count: Optional[int] = 0
 
     class Config:
         from_attributes = True
@@ -95,19 +119,24 @@ class TaskCreate(BaseModel):
     column_id: int
     title: str
     description: Optional[str] = None
-    priority: str = "medium"
+    node_output: Optional[str] = None
+    linked_document_id: Optional[int] = None
     assignee_id: Optional[int] = None
     due_date: Optional[datetime] = None
+    delivery_dates: Optional[List[datetime]] = None
     tags: Optional[List[str]] = None
 
 
 class TaskUpdate(BaseModel):
+    project_id: Optional[int] = None
     title: Optional[str] = None
     description: Optional[str] = None
-    priority: Optional[str] = None
+    node_output: Optional[str] = None
+    linked_document_id: Optional[int] = None
     assignee_id: Optional[int] = None
     column_id: Optional[int] = None
     due_date: Optional[datetime] = None
+    delivery_dates: Optional[List[datetime]] = None
     tags: Optional[List[str]] = None
     order: Optional[int] = None
 
@@ -124,14 +153,18 @@ class TaskResponse(BaseModel):
     column_id: int
     title: str
     description: Optional[str]
-    priority: str
+    node_output: Optional[str]
+    linked_document_id: Optional[int]
     assignee_id: Optional[int]
     assignee: Optional["UserResponse"] = None
     due_date: Optional[datetime]
+    delivery_dates: Optional[List[datetime]] = []
+    completed_by: Optional[List[str]] = []
     tags: Optional[List[str]] = []
     order: int
     created_at: Optional[datetime]
     attachments: List["AttachmentResponse"] = []
+    recent_comments: List["CommentResponse"] = []
 
     class Config:
         from_attributes = True
@@ -168,6 +201,19 @@ class CommentResponse(BaseModel):
         from_attributes = True
 
 
+class MentionNotificationResponse(BaseModel):
+    id: int
+    comment_id: int
+    task_id: int
+    project_id: int
+    task_title: str
+    project_name: Optional[str] = None
+    comment_content: str
+    mentioned_by: Optional[UserResponse] = None
+    created_at: Optional[datetime]
+    is_read: bool
+
+
 # === 文档 ===
 class DocumentCreate(BaseModel):
     title: str
@@ -193,6 +239,8 @@ class DocumentResponse(BaseModel):
     is_public: bool
     share_mode: Optional[str]
     view_count: int
+    last_editor_id: Optional[int] = None
+    last_editor: Optional[UserResponse] = None
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
 
@@ -235,3 +283,27 @@ class FolderResponse(BaseModel):
 # 前向引用
 ColumnResponse.model_rebuild()
 TaskResponse.model_rebuild()
+
+
+# === 工作日志 ===
+class WorkLogCreate(BaseModel):
+    log_date: datetime
+    content: str
+
+
+class WorkLogUpdate(BaseModel):
+    log_date: Optional[datetime] = None
+    content: Optional[str] = None
+
+
+class WorkLogResponse(BaseModel):
+    id: int
+    user_id: int
+    log_date: datetime
+    content: str
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    user: Optional[UserResponse] = None
+
+    class Config:
+        from_attributes = True

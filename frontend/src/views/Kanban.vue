@@ -6,7 +6,7 @@
           <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
         </el-select>
         <el-button @click="loadKanban">刷新</el-button>
-        <el-button type="success" class="create-task-button" @click="showAddTask">添加任务</el-button>
+        <el-button type="success" class="create-task-button" :disabled="!selectedProject" @click="showAddTask">添加任务</el-button>
       </div>
     </template>
 
@@ -37,8 +37,11 @@
                   v-if="task.assignee_id && resolveUser(task.assignee_id)"
                   class="user-pill"
                   :style="{ background: resolveUser(task.assignee_id).color || '#93c5fd' }"
+                  :title="userPresenceTitle(resolveUser(task.assignee_id))"
                 >
+                  <span class="mini-presence-dot" :class="{ online: isUserOnline(resolveUser(task.assignee_id)) }"></span>
                   {{ resolveUser(task.assignee_id).display_name || resolveUser(task.assignee_id).username }}
+                  <span class="user-presence-text">{{ userPresenceText(resolveUser(task.assignee_id)) }}</span>
                 </span>
                 <span v-if="latestDeliveryDate(task)" class="pill">{{ formatDate(latestDeliveryDate(task)) }}</span>
               </div>
@@ -159,7 +162,7 @@
         <el-form-item label="交付时间">
           <el-date-picker v-model="newTask.due_date" type="datetime" style="width: 100%" />
         </el-form-item>
-        <el-button type="primary" :loading="creating" native-type="submit" style="width: 100%" @click="createTask">
+        <el-button type="primary" :loading="creating" native-type="submit" style="width: 100%">
           创建任务
         </el-button>
       </el-form>
@@ -168,13 +171,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
+import { isUserOnline, userPresenceText, userPresenceTitle } from '@/utils/presence'
 
 const route = useRoute()
 const router = useRouter()
@@ -185,6 +189,7 @@ const selectedProject = ref(null)
 const columns = ref([])
 const users = ref([])
 const projectDocuments = ref([])
+let usersRefreshTimer = null
 
 const taskDrawer = ref(false)
 const currentTask = ref(null)
@@ -238,7 +243,23 @@ onMounted(async () => {
     await loadKanban()
     await openTaskFromQuery()
   }
+  usersRefreshTimer = window.setInterval(refreshUsers, 30000)
 })
+
+onUnmounted(() => {
+  if (usersRefreshTimer) {
+    window.clearInterval(usersRefreshTimer)
+    usersRefreshTimer = null
+  }
+})
+
+async function refreshUsers() {
+  try {
+    users.value = await api.get('/auth/users')
+  } catch (error) {
+    console.error(error)
+  }
+}
 
 async function handleProjectSwitch() {
   await loadKanban()
@@ -366,11 +387,26 @@ async function addComment() {
 }
 
 function resolvePendingColumnId() {
-  const pendingColumn = columns.value.find(item => item.name === '待处理')
+  const pendingColumn = columns.value.find(item => item.name?.trim() === '待处理')
   return pendingColumn?.id || null
 }
 
-function showAddTask() {
+async function ensurePendingColumnId() {
+  let pendingColumnId = resolvePendingColumnId()
+  if (pendingColumnId) return pendingColumnId
+  await loadKanban()
+  pendingColumnId = resolvePendingColumnId()
+  return pendingColumnId
+}
+
+async function showAddTask() {
+  if (!selectedProject.value) {
+    ElMessage.warning('请先选择项目')
+    return
+  }
+  if (!resolvePendingColumnId()) {
+    await loadKanban()
+  }
   newTask.title = ''
   newTask.description = ''
   newTask.node_output = ''
@@ -381,13 +417,14 @@ function showAddTask() {
 }
 
 async function createTask() {
+  if (creating.value) return
   if (!newTask.title) {
     ElMessage.warning('请输入任务标题')
     return
   }
-  const pendingColumnId = resolvePendingColumnId()
+  const pendingColumnId = await ensurePendingColumnId()
   if (!pendingColumnId) {
-    ElMessage.error('当前项目缺少待处理列，无法创建任务')
+    ElMessage.error('看板列加载失败，请刷新后再试')
     return
   }
   creating.value = true
@@ -498,11 +535,30 @@ function formatDate(value) {
 .user-pill {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   padding: 4px 10px;
   border-radius: 999px;
   color: #0f172a;
   font-size: 12px;
   font-weight: 600;
+}
+
+.mini-presence-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.mini-presence-dot.online {
+  background: #16a34a;
+}
+
+.user-presence-text {
+  color: rgba(15, 23, 42, 0.68);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .task-card-note {
@@ -589,5 +645,64 @@ function formatDate(value) {
 .drawer-actions {
   display: flex;
   gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .kanban-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .kanban-actions .el-select {
+    grid-column: 1 / -1;
+    width: 100% !important;
+  }
+
+  .create-task-button {
+    min-width: 0;
+  }
+
+  .project-hero {
+    margin-bottom: 14px;
+    padding: 18px;
+    border-radius: 18px;
+  }
+
+  .project-hero-title {
+    font-size: 24px;
+  }
+
+  .project-hero-meta {
+    font-size: 13px;
+  }
+
+  .user-presence-text {
+    display: none;
+  }
+
+  .task-comment-chip {
+    display: grid;
+    gap: 4px;
+  }
+
+  .delivery-item {
+    display: grid;
+    gap: 4px;
+  }
+
+  .extension-panel,
+  .drawer-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .extension-panel .el-button,
+  .drawer-actions .el-button {
+    width: 100%;
+    margin-left: 0 !important;
+  }
 }
 </style>

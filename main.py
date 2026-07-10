@@ -6,10 +6,9 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from app.core.config import settings
-from app.core.database import engine, Base, get_db, ensure_runtime_schema
+from app.core.database import engine, Base, ensure_runtime_schema
 from app.routers import auth, projects, tasks, documents, kanban, worklogs
 
 # 创建数据库表
@@ -27,12 +26,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 静态文件和模板（文档预览用）
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+# 上传文件（附件、文档素材）走运行时配置，方便本地和服务器挂载同一持久化目录。
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 # 注册路由
 app.include_router(auth.router, prefix="/api/auth", tags=["认证"])

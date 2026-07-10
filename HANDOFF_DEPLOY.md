@@ -47,85 +47,85 @@
 
 主要目录：
 
-- `/Users/mac/workteam/main.py`
-- `/Users/mac/workteam/app/core`
-- `/Users/mac/workteam/app/models`
-- `/Users/mac/workteam/app/routers`
-- `/Users/mac/workteam/app/schemas`
+- `/Users/xiaohemacmini/dev/workteam/main.py`
+- `/Users/xiaohemacmini/dev/workteam/app/core`
+- `/Users/xiaohemacmini/dev/workteam/app/models`
+- `/Users/xiaohemacmini/dev/workteam/app/routers`
+- `/Users/xiaohemacmini/dev/workteam/app/schemas`
 
 关键文件：
 
-- `/Users/mac/workteam/main.py`
+- `/Users/xiaohemacmini/dev/workteam/main.py`
   后端应用入口，挂载路由、静态目录、数据库初始化
 
-- `/Users/mac/workteam/app/core/config.py`
+- `/Users/xiaohemacmini/dev/workteam/app/core/config.py`
   当前数据库、JWT、上传目录配置
 
-- `/Users/mac/workteam/app/core/database.py`
+- `/Users/xiaohemacmini/dev/workteam/app/core/database.py`
   数据库连接与运行时补列逻辑
 
-- `/Users/mac/workteam/app/models/models.py`
+- `/Users/xiaohemacmini/dev/workteam/app/models/models.py`
   SQLAlchemy 模型定义
 
-- `/Users/mac/workteam/app/schemas/schemas.py`
+- `/Users/xiaohemacmini/dev/workteam/app/schemas/schemas.py`
   Pydantic 请求 / 响应模型
 
-- `/Users/mac/workteam/app/routers/auth.py`
+- `/Users/xiaohemacmini/dev/workteam/app/routers/auth.py`
   登录、注册、成员管理
 
-- `/Users/mac/workteam/app/routers/projects.py`
+- `/Users/xiaohemacmini/dev/workteam/app/routers/projects.py`
   项目管理和默认看板列创建
 
-- `/Users/mac/workteam/app/routers/kanban.py`
+- `/Users/xiaohemacmini/dev/workteam/app/routers/kanban.py`
   看板查询、列操作、任务移动
 
-- `/Users/mac/workteam/app/routers/tasks.py`
+- `/Users/xiaohemacmini/dev/workteam/app/routers/tasks.py`
   任务 CRUD、评论、附件、延期、领取、完成流转
 
-- `/Users/mac/workteam/app/routers/documents.py`
+- `/Users/xiaohemacmini/dev/workteam/app/routers/documents.py`
   文档 CRUD、分享、文件资产
 
 ### 前端
 
 主要目录：
 
-- `/Users/mac/workteam/frontend/src/views`
-- `/Users/mac/workteam/frontend/src/components`
-- `/Users/mac/workteam/frontend/src/assets`
-- `/Users/mac/workteam/frontend/src/stores`
-- `/Users/mac/workteam/frontend/src/api`
-- `/Users/mac/workteam/frontend/src/router`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/components`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/assets`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/stores`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/api`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/router`
 
 关键文件：
 
-- `/Users/mac/workteam/frontend/src/components/AppShell.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/components/AppShell.vue`
   统一后台壳子布局，侧边栏、头部、页面容器都在这里
 
-- `/Users/mac/workteam/frontend/src/assets/main.css`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/assets/main.css`
   全局样式主文件
 
-- `/Users/mac/workteam/frontend/src/router/index.js`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/router/index.js`
   前端路由
 
-- `/Users/mac/workteam/frontend/src/views/Dashboard.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Dashboard.vue`
   总览页
 
-- `/Users/mac/workteam/frontend/src/views/Projects.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Projects.vue`
   项目页
 
-- `/Users/mac/workteam/frontend/src/views/Kanban.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Kanban.vue`
   项目看板页
 
-- `/Users/mac/workteam/frontend/src/views/Tasks.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Tasks.vue`
   任务列表页
 
-- `/Users/mac/workteam/frontend/src/views/Documents.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Documents.vue`
   文档中心列表
 
-- `/Users/mac/workteam/frontend/src/views/DocEditor.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/DocEditor.vue`
   文档编辑器
 
-- `/Users/mac/workteam/frontend/src/views/Members.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Members.vue`
   成员管理
 
 ## 4. 当前主要业务规则
@@ -141,7 +141,7 @@
 
 定义位置：
 
-- `/Users/mac/workteam/app/routers/projects.py`
+- `/Users/xiaohemacmini/dev/workteam/app/routers/projects.py`
 
 ### 4.2 任务当前结构
 
@@ -166,7 +166,7 @@
 
 模型定义位置：
 
-- `/Users/mac/workteam/app/models/models.py`
+- `/Users/xiaohemacmini/dev/workteam/app/models/models.py`
 
 ### 4.3 交付时间规则
 
@@ -179,12 +179,12 @@
 
 接口逻辑位置：
 
-- `/Users/mac/workteam/app/routers/tasks.py`
+- `/Users/xiaohemacmini/dev/workteam/app/routers/tasks.py`
 
 前端交互位置：
 
-- `/Users/mac/workteam/frontend/src/views/Kanban.vue`
-- `/Users/mac/workteam/frontend/src/views/Tasks.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Kanban.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Tasks.vue`
 
 ### 4.4 完成任务规则
 
@@ -193,7 +193,7 @@
 
 接口位置：
 
-- `/Users/mac/workteam/app/routers/tasks.py`
+- `/Users/xiaohemacmini/dev/workteam/app/routers/tasks.py`
 
 ### 4.5 领取任务规则
 
@@ -205,7 +205,7 @@
 接口位置：
 
 - `POST /api/tasks/{task_id}/claim`
-- 实现文件：`/Users/mac/workteam/app/routers/tasks.py`
+- 实现文件：`/Users/xiaohemacmini/dev/workteam/app/routers/tasks.py`
 
 ### 4.6 关联文档规则
 
@@ -218,8 +218,8 @@
 
 相关文件：
 
-- `/Users/mac/workteam/frontend/src/views/Kanban.vue`
-- `/Users/mac/workteam/frontend/src/views/Tasks.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Kanban.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Tasks.vue`
 
 ## 5. 已完成的重要改造
 
@@ -234,12 +234,12 @@
 
 涉及文件：
 
-- `/Users/mac/workteam/frontend/src/components/AppShell.vue`
-- `/Users/mac/workteam/frontend/src/assets/main.css`
-- `/Users/mac/workteam/frontend/src/assets/logo-xudong.svg`
-- `/Users/mac/workteam/frontend/index.html`
-- `/Users/mac/workteam/index.html`
-- `/Users/mac/workteam/main.py`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/components/AppShell.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/assets/main.css`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/assets/logo-xudong.svg`
+- `/Users/xiaohemacmini/dev/workteam/frontend/index.html`
+- `/Users/xiaohemacmini/dev/workteam/index.html`
+- `/Users/xiaohemacmini/dev/workteam/main.py`
 
 ### 成员管理
 
@@ -251,9 +251,9 @@
 
 涉及文件：
 
-- `/Users/mac/workteam/app/routers/auth.py`
-- `/Users/mac/workteam/frontend/src/views/Members.vue`
-- `/Users/mac/workteam/frontend/src/utils/userColors.js`
+- `/Users/xiaohemacmini/dev/workteam/app/routers/auth.py`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Members.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/utils/userColors.js`
 
 ### 项目管理
 
@@ -264,9 +264,9 @@
 
 涉及文件：
 
-- `/Users/mac/workteam/app/routers/projects.py`
-- `/Users/mac/workteam/frontend/src/views/Projects.vue`
-- `/Users/mac/workteam/frontend/src/components/AppShell.vue`
+- `/Users/xiaohemacmini/dev/workteam/app/routers/projects.py`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Projects.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/components/AppShell.vue`
 
 ### 文档中心
 
@@ -278,9 +278,9 @@
 
 涉及文件：
 
-- `/Users/mac/workteam/app/routers/documents.py`
-- `/Users/mac/workteam/frontend/src/views/DocEditor.vue`
-- `/Users/mac/workteam/frontend/package.json`
+- `/Users/xiaohemacmini/dev/workteam/app/routers/documents.py`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/DocEditor.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/package.json`
 
 ### 任务和看板
 
@@ -292,10 +292,10 @@
 
 涉及文件：
 
-- `/Users/mac/workteam/app/routers/tasks.py`
-- `/Users/mac/workteam/app/routers/kanban.py`
-- `/Users/mac/workteam/frontend/src/views/Kanban.vue`
-- `/Users/mac/workteam/frontend/src/views/Tasks.vue`
+- `/Users/xiaohemacmini/dev/workteam/app/routers/tasks.py`
+- `/Users/xiaohemacmini/dev/workteam/app/routers/kanban.py`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Kanban.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Tasks.vue`
 
 ### 总览页
 
@@ -308,17 +308,39 @@
 
 涉及文件：
 
-- `/Users/mac/workteam/frontend/src/views/Dashboard.vue`
+- `/Users/xiaohemacmini/dev/workteam/frontend/src/views/Dashboard.vue`
 
 ## 6. 当前本地运行方式
+
+启动前先准备 `.env`：
+
+```bash
+cd /Users/xiaohemacmini/dev/workteam
+cp .env.example .env
+```
+
+然后在 `.env` 里填入 `DATABASE_URL` 和 `SECRET_KEY`。`SECRET_KEY` 至少 32 个字符，推荐用下面命令生成：
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+```
 
 ### 后端
 
 本地推荐命令：
 
 ```bash
-cd /Users/mac/workteam
-./.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8001
+cd /Users/xiaohemacmini/dev/workteam
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --host 127.0.0.1 --port 8001 --reload
+```
+
+如果 `8001` 被本机其他服务占用，可以改用其他端口，例如：
+
+```bash
+uvicorn main:app --host 127.0.0.1 --port 8011 --reload
 ```
 
 健康检查：
@@ -330,58 +352,54 @@ cd /Users/mac/workteam
 本地推荐命令：
 
 ```bash
-cd /Users/mac/workteam/frontend
-/opt/homebrew/bin/node ./node_modules/vite/bin/vite.js --host 127.0.0.1
+cd /Users/xiaohemacmini/dev/workteam/frontend
+npm install
+npm run dev
+```
+
+如果后端端口不是 `8001`，启动前端时同步设置代理目标：
+
+```bash
+VITE_API_PROXY_TARGET=http://127.0.0.1:8011 npm run dev
 ```
 
 访问地址：
 
 - `http://127.0.0.1:5173`
 
-说明：
-
-- 本地曾遇到 Codex 自带 Node 的 Rollup 原生模块签名问题
-- 当前使用你机器上的 Homebrew Node 来跑 Vite
-- 前端构建命令已经验证通过
-
 构建命令：
 
 ```bash
-cd /Users/mac/workteam/frontend
-/opt/homebrew/bin/node ./node_modules/vite/bin/vite.js build
+cd /Users/xiaohemacmini/dev/workteam/frontend
+npm run build
 ```
 
 ## 7. 数据库与配置现状
 
 当前配置文件：
 
-- `/Users/mac/workteam/app/core/config.py`
+- `/Users/xiaohemacmini/dev/workteam/app/core/config.py`
 
-里面现在直接写了：
+配置已经改成环境变量读取，不再硬编码数据库密码和 JWT 密钥。
 
-- MySQL 地址
-- 端口
-- 用户名密码
-- JWT Secret
+必填配置：
 
-这对本地开发是可用的，但对服务器部署不理想。
-
-### 部署前建议立刻处理
-
-建议接手人优先把以下内容改成环境变量：
-
-- `DB_HOST`
-- `DB_PORT`
-- `DB_USER`
-- `DB_PASSWORD`
-- `DB_NAME`
+- `DATABASE_URL`
 - `SECRET_KEY`
 
-否则存在：
+常用可选配置：
 
-- 凭据硬编码风险
-- 切换服务器环境不方便
-- 后续多环境部署困难
+- `JWT_ALGORITHM`
+- `ACCESS_TOKEN_EXPIRE_MINUTES`
+- `UPLOAD_DIR`
+- `MAX_FILE_SIZE`
+- `BUSINESS_TIMEZONE`
+
+本地和服务器都应通过 `.env` 或运行时环境变量注入配置；`.env` 已被 `.gitignore` 和 `.dockerignore` 排除。
+
+上传文件默认存放在项目根目录的 `uploads/`，容器内默认挂载到 `/app/uploads`。
+
+`backend/` 目录里保留了一份历史入口，现在也已改为环境变量配置，避免误用旧硬编码密钥。
 
 ## 8. 数据库兼容逻辑
 
@@ -389,7 +407,7 @@ cd /Users/mac/workteam/frontend
 
 逻辑位置：
 
-- `/Users/mac/workteam/app/core/database.py`
+- `/Users/xiaohemacmini/dev/workteam/app/core/database.py`
 
 目前会自动检查并补这些列：
 
@@ -408,9 +426,10 @@ cd /Users/mac/workteam/frontend
 
 项目已有：
 
-- `/Users/mac/workteam/Dockerfile`
-- `/Users/mac/workteam/docker-compose.yml`
-- `/Users/mac/workteam/frontend/nginx.conf`
+- `/Users/xiaohemacmini/dev/workteam/Dockerfile`
+- `/Users/xiaohemacmini/dev/workteam/docker-compose.yml`
+- `/Users/xiaohemacmini/dev/workteam/frontend/Dockerfile`
+- `/Users/xiaohemacmini/dev/workteam/frontend/nginx.conf`
 
 ### 现有容器结构
 
@@ -421,67 +440,57 @@ cd /Users/mac/workteam/frontend
 
 前端：
 
-- Nginx 容器
+- Node 构建阶段 + Nginx 运行阶段
 - 对外端口映射 `3000:80`
 - `/api` 和 `/uploads` 都代理到后端容器 `workteam_backend:8000`
 
-### 部署大致步骤
+### 推荐部署流程
 
 1. 安装 Docker / Docker Compose
 2. 在服务器拉取项目代码
-3. 准备环境变量或先改配置文件
-4. 构建前端
-5. 构建后端镜像
-6. 启动 `docker-compose`
-7. 检查数据库连通性
-8. 检查 `/health`
-9. 检查前端登录、项目、看板、文档功能
-
-### 推荐部署流程
-
-前端：
-
-```bash
-cd /path/to/workteam/frontend
-npm install
-npm run build
-```
-
-后端镜像：
+3. 复制 `.env.example` 为 `.env`，填入真实数据库连接和 `SECRET_KEY`
+4. 构建并启动：
 
 ```bash
 cd /path/to/workteam
-docker build -t workteam-backend:latest .
+docker compose up -d --build
 ```
 
-启动：
+5. 健康检查：
 
 ```bash
-cd /path/to/workteam
-docker-compose up -d
+curl http://127.0.0.1:8001/health
 ```
+
+6. 浏览器验证：
+
+- `http://服务器IP:3000/login`
+- 登录
+- 成员管理
+- 项目列表
+- 进入项目看板
+- 新建任务、领取任务、延期、完成任务
+- 文档编辑
+- 任务关联文档
 
 ### 需要接手人重点核对的点
 
-- 服务器是否能访问当前 MySQL
-- `app/core/config.py` 里的数据库地址是否仍然有效
-- 服务器上是否要改为环境变量配置
-- `frontend/dist` 是否先构建好
-- Nginx 代理是否正常转发 `/api`
-- `uploads` 目录是否有持久化
-- 服务器开放端口是否与 `docker-compose.yml` 一致
+- 服务器是否能访问 `.env` 中配置的数据库
+- `SECRET_KEY` 是否是生产环境独立生成的长随机字符串
+- `uploads` 目录是否持久化，且不要随服务重启删除
+- Nginx 代理是否正常转发 `/api` 和 `/uploads`
+- 服务器防火墙 / 安全组是否放通实际对外端口
+- 若绑定域名，域名反向代理应指向前端端口 `3000`
 
 ## 10. 我建议接手人先做的事情
 
 如果目标是“部署到服务器并稳定上线”，建议按下面顺序处理：
 
 1. 先阅读这份文档
-2. 检查 `/Users/mac/workteam/app/core/config.py`
-3. 把数据库和密钥改成环境变量
-4. 在服务器上验证 MySQL 连通
-5. 本地或服务器重新构建前端
-6. 用 Docker Compose 起服务
-7. 完成基本功能回归：
+2. 准备 `.env`
+3. 在服务器上验证数据库连通
+4. 用 Docker Compose 构建并启动服务
+5. 完成基本功能回归：
    - 登录
    - 成员管理
    - 项目列表
@@ -495,17 +504,17 @@ docker-compose up -d
 
 ## 11. 当前已知的技术债
 
-- 配置硬编码在 `app/core/config.py`
 - 没有正式数据库迁移体系
 - 前端主包体积较大，Vite build 会提示 chunk size 偏大
 - 任务完成规则目前强依赖用户名 `mac`
 - 文档与项目的绑定还不够严格，老数据里很多文档没有 `project_id`
+- 当前机器没有 Docker 命令，容器启动需要在安装 Docker 的服务器上验证
 
 ## 12. 如果只让接手人读一份文档
 
 请直接让对方先读：
 
-- `/Users/mac/workteam/HANDOFF_DEPLOY.md`
+- `/Users/xiaohemacmini/dev/workteam/HANDOFF_DEPLOY.md`
 
 读完这份文档，对方应该就能快速知道：
 

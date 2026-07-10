@@ -1,17 +1,40 @@
 """
 数据库模型
+
+注意：
+- 角色字段统一为小写字符串（'admin' / 'member' / 'guest'），不再使用 SQLAlchemy Enum，
+  这是为了兼容 PG（避免强类型 ENUM 在做表结构迁移时的麻烦）以及兼容 MySQL 老数据
+  （历史库中可能存在 'ADMIN' / 'MEMBER' 大写值，应用层在 UserRole 转换处做了大小写兜底）。
+- 时间字段统一为带时区（TIMESTAMP WITH TIME ZONE）。
 """
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Enum
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Text,
+    DateTime,
+    ForeignKey,
+    Boolean,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+
 from app.core.database import Base
-import enum
 
 
-class UserRole(str, enum.Enum):
-    ADMIN = "admin"
-    MEMBER = "member"
-    GUEST = "guest"
+# 角色常量
+ROLE_ADMIN = "admin"
+ROLE_MEMBER = "member"
+ROLE_GUEST = "guest"
+VALID_ROLES = {ROLE_ADMIN, ROLE_MEMBER, ROLE_GUEST}
+
+
+def normalize_role(value):
+    """大小写兜底：把 'ADMIN' / 'admin' 都转成 'admin'。非法值返回 None。"""
+    if value is None:
+        return None
+    v = str(value).strip().lower()
+    return v if v in VALID_ROLES else None
 
 
 class User(Base):
@@ -19,16 +42,19 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
+    email = Column(String(100), unique=True, nullable=True)
     phone = Column(String(20), unique=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(Enum(UserRole), default=UserRole.MEMBER)
+    role = Column(String(20), default=ROLE_MEMBER)
     display_name = Column(String(100))
     color = Column(String(20), default="#93c5fd")
     avatar = Column(String(500))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     is_active = Column(Boolean, default=True)
+    is_online = Column(Boolean, default=False)
     last_visit_time = Column(DateTime(timezone=True), nullable=True)
     last_active_time = Column(DateTime(timezone=True), nullable=True)
+    last_offline_time = Column(DateTime(timezone=True), nullable=True)
 
 
 class Project(Base):
@@ -42,15 +68,26 @@ class Project(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     owner = relationship("User")
-    columns = relationship("TaskColumn", back_populates="project", cascade="all, delete-orphan", order_by="TaskColumn.order")
-    tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+    columns = relationship(
+        "TaskColumn",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        order_by="TaskColumn.order",
+    )
+    tasks = relationship(
+        "Task", back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class TaskColumn(Base):
     __tablename__ = "task_columns"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(
+        Integer,
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     name = Column(String(100), nullable=False)
     order = Column(Integer, default=0)
     color = Column(String(20), default="#667eea")
@@ -63,8 +100,16 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
-    column_id = Column(Integer, ForeignKey("task_columns.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(
+        Integer,
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    column_id = Column(
+        Integer,
+        ForeignKey("task_columns.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     title = Column(String(500), nullable=False)
     description = Column(Text)
     priority = Column(String(20), default="medium")
@@ -83,8 +128,12 @@ class Task(Base):
     project = relationship("Project", back_populates="tasks")
     column = relationship("TaskColumn", back_populates="tasks")
     assignee = relationship("User")
-    attachments = relationship("Attachment", back_populates="task", cascade="all, delete-orphan")
-    comments = relationship("Comment", back_populates="task", cascade="all, delete-orphan")
+    attachments = relationship(
+        "Attachment", back_populates="task", cascade="all, delete-orphan"
+    )
+    comments = relationship(
+        "Comment", back_populates="task", cascade="all, delete-orphan"
+    )
 
 
 class Attachment(Base):
@@ -107,7 +156,11 @@ class Comment(Base):
     __tablename__ = "comments"
 
     id = Column(Integer, primary_key=True, index=True)
-    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    task_id = Column(
+        Integer,
+        ForeignKey("tasks.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     content = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -121,15 +174,19 @@ class CommentMention(Base):
     __tablename__ = "comment_mentions"
 
     id = Column(Integer, primary_key=True, index=True)
-    comment_id = Column(Integer, ForeignKey("comments.id", ondelete="CASCADE"), nullable=False)
-    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    comment_id = Column(
+        Integer,
+        ForeignKey("comments.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    task_id = Column(
+        Integer,
+        ForeignKey("tasks.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    comment = relationship("Comment")
-    task = relationship("Task")
-    user = relationship("User")
 
 
 class Document(Base):
@@ -138,35 +195,28 @@ class Document(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(500), nullable=False)
     content = Column(Text)
-    doc_type = Column(String(50), default="doc")
+    doc_type = Column(String(50))
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="SET NULL"))
     creator_id = Column(Integer, ForeignKey("users.id"))
     folder_id = Column(Integer, ForeignKey("folders.id"))
     is_public = Column(Boolean, default=False)
-    share_token = Column(String(100), unique=True)
-    share_mode = Column(String(20), default="readonly")
+    share_token = Column(String(100))
+    share_mode = Column(String(20))
     share_expire = Column(DateTime(timezone=True))
     view_count = Column(Integer, default=0)
-    last_editor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    last_editor_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    creator = relationship("User", foreign_keys=[creator_id])
-    last_editor = relationship("User", foreign_keys=[last_editor_id])
-    project = relationship("Project")
 
 
 class Folder(Base):
     __tablename__ = "folders"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False)
-    parent_id = Column(Integer, ForeignKey("folders.id", ondelete="CASCADE"))
+    name = Column(String(100), nullable=False)
+    parent_id = Column(Integer, ForeignKey("folders.id"))
     owner_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    parent = relationship("Folder", remote_side=[id])
-    owner = relationship("User")
 
 
 class FileAsset(Base):
@@ -180,8 +230,6 @@ class FileAsset(Base):
     file_size = Column(Integer)
     uploader_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    uploader = relationship("User")
 
 
 class WorkLog(Base):

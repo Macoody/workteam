@@ -6,16 +6,21 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.core.database import get_db
-from app.models.models import User, Project, TaskColumn, Task, UserRole
+from app.models.models import User, Project, TaskColumn, Task, ROLE_ADMIN, normalize_role
 from app.schemas.schemas import ColumnCreate, ColumnUpdate, ColumnResponse, TaskMove
 from app.routers.auth import get_current_user, require_admin
 from app.routers.tasks import build_task_response
+from app.routers.projects import ensure_default_columns
 
 router = APIRouter()
 
 
 @router.get("/project/{project_id}", response_model=List[ColumnResponse])
 def get_kanban(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    ensure_default_columns(db, project_id)
     columns = db.query(TaskColumn).filter(TaskColumn.project_id == project_id).order_by(TaskColumn.order).all()
     result = []
     for col in columns:
@@ -38,7 +43,7 @@ def create_column(project_id: int, data: ColumnCreate, db: Session = Depends(get
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
-    if current_user.role.value != "admin" and project.owner_id != current_user.id:
+    if normalize_role(current_user.role) != ROLE_ADMIN and project.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="无权限")
     
     col = TaskColumn(project_id=project_id, **data.model_dump())
@@ -55,7 +60,7 @@ def update_column(column_id: int, data: ColumnUpdate, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="列不存在")
     
     project = db.query(Project).filter(Project.id == col.project_id).first()
-    if current_user.role.value != "admin" and project.owner_id != current_user.id:
+    if normalize_role(current_user.role) != ROLE_ADMIN and project.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="无权限")
     
     if data.name is not None:

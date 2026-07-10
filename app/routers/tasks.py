@@ -11,13 +11,14 @@ from datetime import datetime
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.models import User, Task, TaskColumn, Attachment, Comment, CommentMention, UserRole, Document, Project
+from app.models.models import User, Task, TaskColumn, Attachment, Comment, CommentMention, Document, Project, ROLE_ADMIN
 from app.routers.auth import _update_last_active_time
 from app.schemas.schemas import (
     TaskCreate, TaskUpdate, TaskResponse,
     CommentCreate, CommentResponse, AttachmentResponse, MentionNotificationResponse
 )
 from app.routers.auth import get_current_user
+from app.routers.projects import ensure_default_columns
 
 router = APIRouter()
 
@@ -143,6 +144,7 @@ def list_tasks(project_id: int = None, my_tasks: bool = False, db: Session = Dep
 
 @router.post("", response_model=TaskResponse)
 def create_task(data: TaskCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    ensure_default_columns(db, data.project_id)
     col = db.query(TaskColumn).filter(TaskColumn.id == data.column_id).first()
     if not col:
         raise HTTPException(status_code=404, detail="列不存在")
@@ -278,7 +280,7 @@ def complete_task(task_id: int, db: Session = Depends(get_db), current_user: Use
         completed_by.append(current_user.username)
     task.completed_by = json.dumps(completed_by)
 
-    target_name = "已完成" if current_user.role == UserRole.ADMIN else "待验收"
+    target_name = "已完成" if current_user.role == ROLE_ADMIN else "待验收"
     target_column = resolve_target_column(db, task.project_id, target_name)
     if not target_column:
         raise HTTPException(status_code=400, detail=f"项目中缺少“{target_name}”列")

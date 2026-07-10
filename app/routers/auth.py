@@ -13,19 +13,61 @@ from datetime import datetime, timedelta
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.models import User, UserRole
+from app.models.models import User, normalize_role, ROLE_ADMIN
 from app.schemas.schemas import UserCreate, UserManageCreate, UserManageUpdate, UserResponse, TokenResponse
 
 router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+ONLINE_TIMEOUT_SECONDS = 90
+
+
+def _naive(value: datetime | None):
+    if value is None:
+        return None
+    return value.replace(tzinfo=None)
+
+
+def _mark_online(db: Session, user: User, commit: bool = True):
+    now = datetime.now()
+    user.is_online = True
+    user.last_visit_time = now
+    user.last_active_time = now
+    if commit:
+        db.commit()
+        db.refresh(user)
+    return user
+
+
+def _mark_offline(db: Session, user: User, commit: bool = True):
+    now = datetime.now()
+    user.is_online = False
+    user.last_offline_time = now
+    if commit:
+        db.commit()
+        db.refresh(user)
+    return user
+
+
+def _normalize_presence(user: User, now: datetime | None = None) -> bool:
+    now = now or datetime.now()
+    if not user.is_online:
+        return False
+    last_active = _naive(user.last_active_time)
+    if last_active and (now - last_active).total_seconds() <= ONLINE_TIMEOUT_SECONDS:
+        return False
+    user.is_online = False
+    user.last_offline_time = (
+        user.last_active_time + timedelta(seconds=ONLINE_TIMEOUT_SECONDS)
+        if user.last_active_time
+        else now
+    )
+    return True
 
 
 def _update_last_active_time(db: Session, user: User):
     """更新用户最后活跃时间（本地时区）"""
-    now = datetime.now()
-    user.last_active_time = now
-    db.commit()
+    _mark_online(db, user)
 
 
 def _clean_optional(value: str | None):
@@ -33,6 +75,13 @@ def _clean_optional(value: str | None):
         return None
     value = value.strip()
     return value or None
+
+
+def _clean_username(value: str | None):
+    value = (value or "").strip()
+    if not value:
+        raise HTTPException(status_code=400, detail="用户名不能为空")
+    return value
 
 
 def _clean_color(value: str | None):
@@ -110,24 +159,28 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     user = db.query(User).filter(User.id == int(user_id)).first()
     if user is None or not user.is_active:
         raise credentials_exception
-    # 更新 last_visit_time（最多每 60 秒一次，避免频繁写库）
+    # 更新访问和在线状态（最多每 60 秒写一次，避免普通接口频繁写库）
     now = datetime.now()
-    if user.last_visit_time is None or (now - user.last_visit_time.replace(tzinfo=None)).total_seconds() > 60:
+    last_visit_time = _naive(user.last_visit_time)
+    if not user.is_online or user.last_visit_time is None or (now - last_visit_time).total_seconds() > 60:
+        user.is_online = True
         user.last_visit_time = now
+        user.last_active_time = now
         db.commit()
     return user
 
 
 def require_admin(current_user: User = Depends(get_current_user)):
-    if current_user.role != UserRole.ADMIN:
+    if normalize_role(current_user.role) != ROLE_ADMIN:
         raise HTTPException(status_code=403, detail="需要管理员权限")
     return current_user
 
 
 @router.post("/register", response_model=TokenResponse)
 def register(data: UserCreate, db: Session = Depends(get_db)):
+    username = _clean_username(data.username)
     phone = _clean_optional(data.phone)
-    existing = db.query(User).filter(User.username == data.username).first()
+    existing = db.query(User).filter(User.username == username).first()
     if existing:
         if existing.is_active:
             raise HTTPException(status_code=400, detail="用户名已存在")
@@ -145,11 +198,11 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
             user=UserResponse.model_validate(existing)
         )
     user = User(
-        username=data.username,
+        username=username,
         password_hash=get_password_hash(data.password),
-        display_name=data.display_name or data.username,
+        display_name=data.display_name or username,
         phone=phone,
-        role=UserRole.MEMBER,
+        role="member",
     )
     db.add(user)
     db.commit()
@@ -164,7 +217,8 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 def login(data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == data.username, User.is_active == True).first()
+    username = _clean_username(data.username)
+    user = db.query(User).filter(User.username == username, User.is_active == True).first()
     if not user:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     
@@ -182,10 +236,7 @@ def login(data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账户已被禁用")
 
-    now = datetime.now()
-    user.last_visit_time = now
-    user.last_active_time = now
-    db.commit()
+    _mark_online(db, user, commit=True)
 
     access_token = create_access_token(data={"sub": str(user.id)})
     return TokenResponse(
@@ -199,30 +250,49 @@ def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+@router.post("/presence/heartbeat", response_model=UserResponse)
+def presence_heartbeat(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return _mark_online(db, current_user)
+
+
+@router.post("/presence/offline")
+def presence_offline(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _mark_offline(db, current_user)
+    return {"ok": True, "last_offline_time": current_user.last_offline_time}
+
+
 @router.get("/users", response_model=list[UserResponse])
 def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return db.query(User).filter(User.is_active.is_(True)).order_by(User.created_at.desc()).all()
+    users = db.query(User).filter(User.is_active.is_(True)).order_by(User.created_at.desc()).all()
+    now = datetime.now()
+    changed = any(_normalize_presence(user, now) for user in users)
+    if changed:
+        db.commit()
+        for user in users:
+            db.refresh(user)
+    return users
 
 
 @router.post("/users", response_model=UserResponse)
 def create_user(data: UserManageCreate, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    username = _clean_username(data.username)
     phone = _clean_optional(data.phone)
     color = _clean_color(data.color)
 
-    if db.query(User).filter(User.username == data.username).first():
+    if db.query(User).filter(User.username == username).first():
         raise HTTPException(status_code=400, detail="用户名已存在")
     if phone and db.query(User).filter(User.phone == phone).first():
         raise HTTPException(status_code=400, detail="手机号已存在")
 
     try:
-        role = UserRole(data.role)
+        role = normalize_role(data.role) or "member"
     except ValueError:
         raise HTTPException(status_code=400, detail="无效的角色")
 
     user = User(
-        username=data.username,
+        username=username,
         password_hash=get_password_hash(data.password),
-        display_name=data.display_name or data.username,
+        display_name=data.display_name or username,
         phone=phone,
         role=role,
         color=color,
@@ -251,7 +321,7 @@ def update_user(user_id: int, data: UserManageUpdate, db: Session = Depends(get_
 
     if data.role is not None:
         try:
-            user.role = UserRole(data.role)
+            user.role = normalize_role(data.role) or "member"
         except ValueError:
             raise HTTPException(status_code=400, detail="无效的角色")
 
@@ -290,7 +360,7 @@ def update_user_role(user_id: int, role: str, db: Session = Depends(get_db), adm
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     try:
-        user.role = UserRole(role)
+        user.role = normalize_role(role) or "member"
     except ValueError:
         raise HTTPException(status_code=400, detail="无效的角色")
     db.commit()

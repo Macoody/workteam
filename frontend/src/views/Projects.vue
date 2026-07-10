@@ -203,25 +203,44 @@ function formatDate(value) {
 .project-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 18px;
+  gap: 6px;
+  margin-top: 14px;
 }
 
 .project-stat-item {
-  border-radius: 16px;
-  padding: 12px 10px;
+  border-radius: 12px;
+  padding: 8px 4px;
+  text-align: center;
+  min-width: 0;
 }
 
 .project-stat-label {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
   opacity: 0.9;
+  white-space: nowrap;
 }
 
 .project-stat-value {
-  margin-top: 8px;
-  font-size: 26px;
+  margin-top: 4px;
+  font-size: 20px;
   font-weight: 800;
   line-height: 1;
+}
+
+@media (max-width: 480px) {
+  .project-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .project-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .project-card {
+    padding: 14px !important;
+  }
+  .project-stat-value {
+    font-size: 18px;
+  }
 }
 </style>

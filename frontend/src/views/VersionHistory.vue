@@ -16,20 +16,23 @@
       <div class="history-header">
         <div>
           <h3 class="section-title">更新明细</h3>
-          <div class="history-subtitle">按更新条目分页，每页 20 行，最近更新排在最前。</div>
+          <div class="history-subtitle">按版本展示，最近版本排在最前。</div>
         </div>
-        <div class="history-count">共 {{ flattenedRows.length }} 条</div>
+        <div class="history-count">共 {{ versionHistory.length }} 个版本</div>
       </div>
 
-      <div v-if="pagedRows.length" class="version-list">
-        <div v-for="row in pagedRows" :key="row.key" class="version-row">
+      <div v-if="pagedReleases.length" class="version-list">
+        <div v-for="release in pagedReleases" :key="release.version" class="version-row">
           <div class="version-row-meta">
-            <span class="version-chip">{{ row.version }}</span>
-            <span class="version-row-date">{{ row.date }}</span>
+            <span class="version-chip">{{ release.version }}</span>
+            <span class="version-row-date">{{ release.date }}</span>
           </div>
           <div class="version-row-main">
-            <div class="version-row-title">{{ row.title }}</div>
-            <div class="version-row-detail">{{ row.detail }}</div>
+            <div class="version-row-title">{{ release.title }}</div>
+            <div class="version-row-summary">{{ release.summary }}</div>
+            <ul class="version-detail-list">
+              <li v-for="detail in release.details || []" :key="detail">{{ detail }}</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -39,7 +42,7 @@
         <el-pagination
           background
           layout="prev, pager, next"
-          :total="flattenedRows.length"
+          :total="versionHistory.length"
           :page-size="pageSize"
           v-model:current-page="currentPage"
         />
@@ -53,7 +56,7 @@ import { computed, ref } from 'vue'
 import AppShell from '@/components/AppShell.vue'
 import { versionHistory } from '@/data/versionHistory'
 
-const pageSize = 20
+const pageSize = 5
 const currentPage = ref(1)
 
 const latestRelease = computed(() => versionHistory[0] || {
@@ -63,21 +66,9 @@ const latestRelease = computed(() => versionHistory[0] || {
   summary: '暂无更新说明。'
 })
 
-const flattenedRows = computed(() =>
-  versionHistory.flatMap(release =>
-    (release.details || []).map((detail, index) => ({
-      key: `${release.version}-${index}`,
-      version: release.version,
-      date: release.date,
-      title: release.title,
-      detail
-    }))
-  )
-)
-
-const pagedRows = computed(() => {
+const pagedReleases = computed(() => {
   const start = (currentPage.value - 1) * pageSize
-  return flattenedRows.value.slice(start, start + pageSize)
+  return versionHistory.slice(start, start + pageSize)
 })
 </script>
 
@@ -197,11 +188,23 @@ const pagedRows = computed(() => {
   font-weight: 700;
 }
 
-.version-row-detail {
+.version-row-summary {
   margin-top: 6px;
   color: #475569;
   font-size: 14px;
   line-height: 1.7;
+}
+
+.version-detail-list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.version-detail-list li + li {
+  margin-top: 4px;
 }
 
 .pagination-wrap {

@@ -16,7 +16,7 @@ const routes = [
   { path: '/tasks', name: 'Tasks', component: () => import('@/views/Tasks.vue'), meta: { requiresAuth: true } },
   { path: '/documents', name: 'Documents', component: () => import('@/views/Documents.vue'), meta: { requiresAuth: true } },
   { path: '/documents/:id', name: 'DocEditor', component: () => import('@/views/DocEditor.vue'), meta: { requiresAuth: true } },
-  { path: '/versions', name: 'Versions', component: () => import('@/views/VersionHistory.vue'), meta: { requiresAuth: true } },
+  { path: '/versions', name: 'Versions', component: () => import('@/views/VersionHistory.vue'), meta: { requiresAuth: false } },
   { path: '/logs', name: 'WorkLogs', component: () => import('@/views/WorkLogs.vue'), meta: { requiresAuth: true } },
 ]
 

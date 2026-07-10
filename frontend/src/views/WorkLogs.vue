@@ -53,8 +53,13 @@
               class="member-chip"
               :class="{ active: selectedUserId === member.id }"
               :style="{ background: selectedUserId === member.id ? member.color : (member.color + '33') }"
+              :title="userPresenceTitle(member)"
               @click="selectedUserId = selectedUserId === member.id ? null : member.id"
-            >{{ member.display_name || member.username }}</button>
+            >
+              <span class="mini-presence-dot" :class="{ online: isUserOnline(member) }"></span>
+              {{ member.display_name || member.username }}
+              <span class="member-presence-text">{{ userPresenceText(member) }}</span>
+            </button>
           </div>
         </div>
       </section>
@@ -69,6 +74,7 @@
               <div class="log-meta">
                 <span class="log-author">
                   <span class="log-dot" :style="{ background: log.user?.color || '#93c5fd' }"></span>
+                  <span v-if="log.user" class="mini-presence-dot" :class="{ online: isUserOnline(log.user) }"></span>
                   {{ log.user?.display_name || log.user?.username || `成员 #${log.user_id}` }}
                 </span>
                 <span class="log-date">{{ formatDate(log.log_date) }}</span>
@@ -100,12 +106,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
+import { isUserOnline, userPresenceText, userPresenceTitle } from '@/utils/presence'
 
 const auth = useAuthStore()
 const loading = ref(false)
@@ -113,6 +120,7 @@ const saving = ref(false)
 const logs = ref([])
 const members = ref([])
 const selectedUserId = ref(null)
+let membersRefreshTimer = null
 const filterDate = ref(dayjs().format('YYYY-MM-DD'))
 const editDialog = ref(false)
 const editingLog = ref(null)
@@ -137,6 +145,16 @@ onMounted(async () => {
   await auth.getMe()
   await loadLogs()
   await loadMembers()
+  membersRefreshTimer = window.setInterval(() => {
+    loadMembers(true)
+  }, 30000)
+})
+
+onUnmounted(() => {
+  if (membersRefreshTimer) {
+    window.clearInterval(membersRefreshTimer)
+    membersRefreshTimer = null
+  }
 })
 
 async function loadLogs() {
@@ -155,11 +173,11 @@ async function loadLogs() {
   }
 }
 
-async function loadMembers() {
+async function loadMembers(silent = false) {
   try {
     members.value = await api.get('/auth/users')
   } catch (error) {
-    console.error(error)
+    if (!silent) console.error(error)
   }
 }
 
@@ -360,6 +378,9 @@ function formatDate(value) {
 }
 
 .member-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid transparent;
   border-radius: 999px;
   padding: 4px 12px;
@@ -368,5 +389,58 @@ function formatDate(value) {
   cursor: pointer;
   transition: all 0.15s;
   color: #0f172a;
+}
+
+.mini-presence-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.mini-presence-dot.online {
+  background: #16a34a;
+}
+
+.member-presence-text {
+  color: rgba(15, 23, 42, 0.68);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .compose-footer,
+  .log-card-header,
+  .log-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .compose-footer .el-button {
+    width: 100%;
+  }
+
+  .log-card {
+    padding: 14px;
+  }
+
+  .log-actions {
+    width: 100%;
+  }
+
+  .log-actions .el-button {
+    flex: 1;
+    margin-left: 0 !important;
+  }
+
+  .member-chip {
+    max-width: 100%;
+  }
+
+  .member-presence-text {
+    display: none;
+  }
 }
 </style>

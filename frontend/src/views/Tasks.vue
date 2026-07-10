@@ -26,8 +26,15 @@
         </el-table-column>
         <el-table-column label="负责人" width="160">
           <template #default="{ row }">
-            <span v-if="resolveUser(row.assignee_id)" class="user-chip" :style="{ background: resolveUser(row.assignee_id).color || '#93c5fd' }">
+            <span
+              v-if="resolveUser(row.assignee_id)"
+              class="user-chip"
+              :style="{ background: resolveUser(row.assignee_id).color || '#93c5fd' }"
+              :title="userPresenceTitle(resolveUser(row.assignee_id))"
+            >
+              <span class="mini-presence-dot" :class="{ online: isUserOnline(resolveUser(row.assignee_id)) }"></span>
               {{ resolveUser(row.assignee_id).display_name || resolveUser(row.assignee_id).username }}
+              <span class="user-presence-text">{{ userPresenceText(resolveUser(row.assignee_id)) }}</span>
             </span>
             <span v-else>--</span>
           </template>
@@ -113,12 +120,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
+import { isUserOnline, userPresenceText, userPresenceTitle } from '@/utils/presence'
 
 const auth = useAuthStore()
 const loading = ref(false)
@@ -128,6 +136,7 @@ const filterProject = ref(null)
 const users = ref([])
 const columnsByProject = ref({})
 const documentsByProject = ref({})
+let usersRefreshTimer = null
 const editDialog = ref(false)
 const currentTask = ref(null)
 const editForm = reactive({
@@ -158,7 +167,23 @@ onMounted(async () => {
   projects.value = projectList || []
   users.value = userList || []
   await loadTasks()
+  usersRefreshTimer = window.setInterval(refreshUsers, 30000)
 })
+
+onUnmounted(() => {
+  if (usersRefreshTimer) {
+    window.clearInterval(usersRefreshTimer)
+    usersRefreshTimer = null
+  }
+})
+
+async function refreshUsers() {
+  try {
+    users.value = await api.get('/auth/users')
+  } catch (error) {
+    console.error(error)
+  }
+}
 
 async function loadTasks() {
   loading.value = true
@@ -326,11 +351,30 @@ function formatDate(value) {
 .user-chip {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   padding: 4px 10px;
   border-radius: 999px;
   color: #0f172a;
   font-size: 12px;
   font-weight: 600;
+}
+
+.mini-presence-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.mini-presence-dot.online {
+  background: #16a34a;
+}
+
+.user-presence-text {
+  color: rgba(15, 23, 42, 0.68);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .task-comment-stack {
@@ -396,5 +440,34 @@ function formatDate(value) {
 
 .action-row {
   margin-top: 16px;
+}
+
+@media (max-width: 640px) {
+  .user-presence-text {
+    display: none;
+  }
+
+  .task-comment-chip {
+    display: grid;
+    gap: 4px;
+  }
+
+  .delivery-item {
+    display: grid;
+    gap: 4px;
+  }
+
+  .extension-row,
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .extension-row .el-button,
+  .action-row .el-button {
+    width: 100%;
+    margin-left: 0 !important;
+  }
 }
 </style>

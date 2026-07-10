@@ -1,0 +1,38 @@
+# WorkTeam / 徐东摆地摊 Docker Compose 部署模板
+#
+# 用法：
+#   cp docker-compose.yml /你的项目目录/
+#   cp .env /你的项目目录/
+#   cd /你的项目目录/
+#   docker compose down
+#   docker compose up -d --build
+#   docker compose logs -f backend
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: workteam-backend:latest
+    container_name: workteam_backend
+    env_file: .env                     # ← 关键：从 .env 读取 DATABASE_URL / SECRET_KEY
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./uploads:/app/uploads        # 持久化上传文件
+    environment:
+      - TZ=Asia/Shanghai
+      - UPLOAD_DIR=/app/uploads
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: workteam-frontend:latest
+    container_name: workteam_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

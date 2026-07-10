@@ -1,10 +1,14 @@
 FROM python:3.11-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UPLOAD_DIR=/app/uploads
+
 WORKDIR /app
 
 # 安装依赖
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt -f /usr/local/lib/python3.11/site-packages/
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制代码
 COPY . .
