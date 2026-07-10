@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -20,6 +21,7 @@ UPLOAD_DIR = os.path.join(settings.UPLOAD_DIR, "documents")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_DOC_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "png", "jpg", "jpeg", "gif", "zip", "rar"]
+BUSINESS_TZ = ZoneInfo(settings.BUSINESS_TIMEZONE)
 
 
 # === 文档 CRUD ===
@@ -28,6 +30,26 @@ def document_query(db: Session):
         joinedload(Document.creator),
         joinedload(Document.last_editor),
     )
+
+
+def utc_now_naive():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def to_business_time(value):
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(BUSINESS_TZ)
+
+
+def build_document_response(doc: Document):
+    item = DocumentResponse.model_validate(doc)
+    item.created_at = to_business_time(doc.created_at)
+    item.updated_at = to_business_time(doc.updated_at)
+    item.last_edited_at = to_business_time(doc.last_edited_at)
+    return item
 
 
 @router.get("", response_model=list[DocumentResponse])
@@ -45,16 +67,17 @@ def list_documents(
         query = query.filter(Document.project_id == project_id)
     if my_docs:
         query = query.filter(Document.creator_id == current_user.id)
-    return query.order_by(
+    docs = query.order_by(
         Document.last_edited_at.desc(),
         Document.updated_at.desc(),
         Document.created_at.desc(),
     ).limit(100).all()
+    return [build_document_response(doc) for doc in docs]
 
 
 @router.post("", response_model=DocumentResponse)
 def create_document(data: DocumentCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    now = datetime.now()
+    now = utc_now_naive()
     doc = Document(
         title=data.title,
         content=data.content or "",
@@ -69,7 +92,7 @@ def create_document(data: DocumentCreate, db: Session = Depends(get_db), current
     db.commit()
     _update_last_active_time(db, current_user)
     db.refresh(doc)
-    return doc
+    return build_document_response(doc)
 
 
 @router.get("/{doc_id}", response_model=DocumentResponse)
@@ -87,7 +110,7 @@ def get_document(doc_id: int, db: Session = Depends(get_db), current_user: User 
     )
     doc.view_count = (doc.view_count or 0) + 1
     db.commit()
-    return doc
+    return build_document_response(doc)
 
 
 @router.put("/{doc_id}", response_model=DocumentResponse)
@@ -106,11 +129,11 @@ def update_document(doc_id: int, data: DocumentUpdate, db: Session = Depends(get
     if edited:
         doc.last_editor_id = current_user.id
         doc.last_editor = current_user
-        doc.last_edited_at = datetime.now()
+        doc.last_edited_at = utc_now_naive()
     db.commit()
     _update_last_active_time(db, current_user)
     db.refresh(doc)
-    return doc
+    return build_document_response(doc)
 
 
 @router.delete("/{doc_id}")
