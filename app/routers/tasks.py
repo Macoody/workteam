@@ -9,12 +9,13 @@ import uuid
 import json
 import re
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.models import (
     User, Task, TaskColumn, Attachment, Comment, CommentMention,
-    Document, Project, RecurringTaskRule, ROLE_ADMIN
+    Document, Project, RecurringTaskRule, ROLE_ADMIN, normalize_role
 )
 from app.routers.auth import _update_last_active_time
 from app.schemas.schemas import (
@@ -30,6 +31,11 @@ router = APIRouter()
 
 UPLOAD_DIR = settings.UPLOAD_DIR
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+BUSINESS_TZ = ZoneInfo(settings.BUSINESS_TIMEZONE)
+
+
+def business_now():
+    return datetime.now(BUSINESS_TZ).replace(tzinfo=None)
 
 
 def allowed_file(filename: str) -> bool:
@@ -84,6 +90,8 @@ def build_task_response(task: Task):
         id=task.id,
         project_id=task.project_id,
         column_id=task.column_id,
+        column_name=task.column.name if task.column else None,
+        column_color=task.column.color if task.column else None,
         title=task.title,
         description=task.description,
         node_output=task.node_output,
@@ -93,6 +101,7 @@ def build_task_response(task: Task):
         due_date=task.due_date,
         delivery_dates=normalize_delivery_dates(parse_json_list(task.delivery_dates)),
         completed_by=parse_json_list(task.completed_by),
+        completed_at=task.completed_at,
         tags=parse_json_list(task.tags),
         recurrence_rule_id=task.recurrence_rule_id,
         recurrence_occurrence_date=task.recurrence_occurrence_date,
@@ -157,12 +166,14 @@ def build_recurring_rule_response(rule: RecurringTaskRule):
 
 
 @router.get("", response_model=list[TaskResponse])
-def list_tasks(project_id: int = None, my_tasks: bool = False, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_tasks(project_id: int = None, assignee_id: int = None, my_tasks: bool = False, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     generate_due_recurring_tasks(db)
     db.commit()
     query = db.query(Task)
     if project_id:
         query = query.filter(Task.project_id == project_id)
+    if assignee_id is not None:
+        query = query.filter(Task.assignee_id == assignee_id)
     if my_tasks:
         query = query.filter(Task.assignee_id == current_user.id)
     tasks = query.order_by(
@@ -375,7 +386,9 @@ def complete_task(task_id: int, db: Session = Depends(get_db), current_user: Use
         completed_by.append(current_user.username)
     task.completed_by = json.dumps(completed_by)
 
-    target_name = "已完成" if current_user.role == ROLE_ADMIN else "待验收"
+    task.completed_at = business_now()
+
+    target_name = "已完成" if normalize_role(current_user.role) == ROLE_ADMIN else "待验收"
     target_column = resolve_target_column(db, task.project_id, target_name)
     if not target_column:
         raise HTTPException(status_code=400, detail=f"项目中缺少“{target_name}”列")

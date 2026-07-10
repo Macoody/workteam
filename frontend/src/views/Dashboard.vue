@@ -39,6 +39,42 @@
       </button>
     </div>
 
+    <section class="panel workbench-panel my-task-panel">
+      <div class="workbench-panel-header">
+        <div>
+          <h3 class="section-title">我的任务</h3>
+          <p>分配给我的所有任务</p>
+        </div>
+        <el-button text type="primary" @click="go('/tasks')">任务列表</el-button>
+      </div>
+      <div v-if="myTaskList.length === 0" class="empty-card compact-empty">暂时没有分配给你的任务。</div>
+      <div v-else class="my-task-list">
+        <button
+          v-for="task in sortedMyTasks"
+          :key="task.id"
+          type="button"
+          class="compact-row task-jump-card my-task-row"
+          :class="{ 'task-completed': isCompletionStatus(task) }"
+          @click="openTask(task)"
+        >
+          <span class="status-pill" :style="statusPillStyle(task)">
+            {{ resolveTaskStatus(task) }}
+          </span>
+          <span class="item-main">
+            <span class="item-title">
+              {{ task.title }}
+              <span v-if="task.recurrence_rule_id" class="inline-tag">周期</span>
+            </span>
+            <span class="item-meta">
+              {{ resolveProjectName(task.project_id) }}
+              <span v-if="taskTimeText(task)"> · {{ taskTimeText(task) }}</span>
+            </span>
+          </span>
+          <el-icon class="row-arrow"><ArrowRight /></el-icon>
+        </button>
+      </div>
+    </section>
+
     <div class="workbench-grid">
       <section class="panel workbench-panel">
         <div class="workbench-panel-header">
@@ -102,7 +138,7 @@
                   {{ resolveUser(task.assignee_id).display_name || resolveUser(task.assignee_id).username }}
                   <span class="user-presence-text">{{ userPresenceText(resolveUser(task.assignee_id)) }}</span>
                 </span>
-                <span v-if="latestDeliveryDate(task)"> · 交付 {{ formatDate(latestDeliveryDate(task)) }}</span>
+                <span v-if="taskTimeText(task)"> · {{ taskTimeText(task) }}</span>
               </span>
               <span v-if="task.recent_comments?.length" class="task-comment-stack">
                 <span v-for="comment in task.recent_comments" :key="comment.id" class="task-comment-chip">
@@ -193,6 +229,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const stats = ref({ projects: 0, tasks: 0, myTasks: 0, documents: 0 })
 const recentTasks = ref([])
+const myTaskList = ref([])
 const projects = ref([])
 const documents = ref([])
 const users = ref([])
@@ -203,7 +240,7 @@ let usersRefreshTimer = null
 const statCards = computed(() => [
   { label: '项目', value: stats.value.projects, footnote: '协作空间', to: '/projects', icon: FolderOpened },
   { label: '任务', value: stats.value.tasks, footnote: '全部事项', to: '/tasks', icon: List },
-  { label: '我的待办', value: stats.value.myTasks, footnote: '待推进', to: '/tasks', icon: Odometer },
+  { label: '我的任务', value: stats.value.myTasks, footnote: '分配给我', to: '/tasks', icon: Odometer },
   { label: '文档', value: stats.value.documents, footnote: '资料沉淀', to: '/documents', icon: Document }
 ])
 const quickActions = [
@@ -219,11 +256,19 @@ const latestDocuments = computed(() =>
     .slice(0, 4)
 )
 const unreadMentionNotifications = computed(() => mentionNotifications.value.filter(item => !item.is_read))
+const sortedMyTasks = computed(() =>
+  myTaskList.value.slice().sort((a, b) => {
+    const aDone = isCompletionStatus(a) ? 1 : 0
+    const bDone = isCompletionStatus(b) ? 1 : 0
+    if (aDone !== bDone) return aDone - bDone
+    return new Date(taskSortTime(b) || 0) - new Date(taskSortTime(a) || 0)
+  })
+)
 
 onMounted(async () => {
   await auth.getMe()
   try {
-    const [projectList, taskList, myTasks, docs, userList, mentions] = await Promise.all([
+    const [projectList, taskList, myTaskResponse, docs, userList, mentions] = await Promise.all([
       api.get('/projects'),
       api.get('/tasks'),
       api.get('/tasks?my_tasks=true'),
@@ -233,6 +278,7 @@ onMounted(async () => {
     ])
     projects.value = projectList || []
     documents.value = docs || []
+    myTaskList.value = Array.isArray(myTaskResponse) ? myTaskResponse : []
     users.value = userList || []
     mentionNotifications.value = mentions || []
     const kanbanResults = await Promise.allSettled(
@@ -253,7 +299,7 @@ onMounted(async () => {
     stats.value = {
       projects: Array.isArray(projectList) ? projectList.length : 0,
       tasks: Array.isArray(taskList) ? taskList.length : 0,
-      myTasks: Array.isArray(myTasks) ? myTasks.length : 0,
+      myTasks: myTaskList.value.length,
       documents: Array.isArray(docs) ? docs.length : 0
     }
     recentTasks.value = (taskList || []).slice(0, 8)
@@ -304,6 +350,21 @@ function statusPillStyle(task) {
 function latestDeliveryDate(task) {
   const dates = task?.delivery_dates || []
   return dates[dates.length - 1] || task?.due_date || null
+}
+
+function isCompletionStatus(task) {
+  return ['待验收', '已完成'].includes(resolveTaskStatus(task))
+}
+
+function taskTimeText(task) {
+  if (isCompletionStatus(task) && task?.completed_at) return `完成 ${formatDate(task.completed_at)}`
+  const deliveryDate = latestDeliveryDate(task)
+  return deliveryDate ? `交付 ${formatDate(deliveryDate)}` : ''
+}
+
+function taskSortTime(task) {
+  if (isCompletionStatus(task)) return task?.completed_at || task?.created_at
+  return latestDeliveryDate(task) || task?.created_at
 }
 
 function formatDate(value) {
@@ -471,6 +532,44 @@ function goToKanban(projectId) {
   grid-template-columns: minmax(260px, 0.9fr) minmax(360px, 1.35fr) minmax(260px, 0.9fr);
   gap: 18px;
   align-items: start;
+}
+
+.my-task-panel {
+  margin-bottom: 18px;
+}
+
+.my-task-list {
+  max-height: 380px;
+  display: grid;
+  gap: 8px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.my-task-row {
+  min-height: 62px;
+}
+
+.my-task-row.task-completed {
+  background: rgba(241, 245, 249, 0.62);
+  color: #64748b;
+}
+
+.my-task-row.task-completed .item-title {
+  text-decoration: line-through;
+}
+
+.inline-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #ecfeff;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 800;
+  vertical-align: 1px;
 }
 
 .workbench-panel {
@@ -745,6 +844,15 @@ function goToKanban(projectId) {
   .workbench-grid {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .my-task-panel {
+    margin-bottom: 14px;
+  }
+
+  .my-task-list {
+    max-height: 420px;
+    padding-right: 0;
   }
 
   .workbench-panel {

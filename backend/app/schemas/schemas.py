@@ -151,6 +151,8 @@ class TaskResponse(BaseModel):
     id: int
     project_id: int
     column_id: int
+    column_name: Optional[str] = None
+    column_color: Optional[str] = None
     title: str
     description: Optional[str]
     node_output: Optional[str]
@@ -160,6 +162,7 @@ class TaskResponse(BaseModel):
     due_date: Optional[datetime]
     delivery_dates: Optional[List[datetime]] = []
     completed_by: Optional[List[str]] = []
+    completed_at: Optional[datetime] = None
     tags: Optional[List[str]] = []
     recurrence_rule_id: Optional[int] = None
     recurrence_occurrence_date: Optional[date] = None

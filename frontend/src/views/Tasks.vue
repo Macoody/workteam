@@ -8,7 +8,12 @@
     </template>
 
     <div class="panel table-panel">
-      <el-table :data="tasks" style="width: 100%" v-loading="loading">
+      <el-table
+        :data="tasks"
+        style="width: 100%"
+        v-loading="loading"
+        :row-class-name="taskRowClassName"
+      >
         <el-table-column label="标题" min-width="320">
           <template #default="{ row }">
             <div class="task-list-cell">
@@ -27,6 +32,13 @@
             </div>
           </template>
         </el-table-column>
+        <el-table-column label="状态" width="120">
+          <template #default="{ row }">
+            <el-tag :type="statusTagType(row)" effect="light" class="status-tag">
+              {{ taskStatusName(row) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="负责人" width="160">
           <template #default="{ row }">
             <span
@@ -42,9 +54,9 @@
             <span v-else>--</span>
           </template>
         </el-table-column>
-        <el-table-column label="交付时间" width="150">
+        <el-table-column label="时间" width="170">
           <template #default="{ row }">
-            {{ formatDate(latestDeliveryDate(row)) }}
+            {{ taskTimeText(row) }}
           </template>
         </el-table-column>
         <el-table-column label="项目" min-width="160">
@@ -103,6 +115,12 @@
           <div class="delivery-item" v-for="(item, index) in deliveryTimeline" :key="`${item}-${index}`">
             <span>{{ index === 0 ? '原始交付时间' : `延期 ${index}` }}</span>
             <span>{{ formatDate(item) }}</span>
+          </div>
+        </div>
+        <div v-if="currentTask?.completed_at" class="delivery-stack">
+          <div class="delivery-item">
+            <span>实际完成时间</span>
+            <span>{{ formatDate(currentTask.completed_at) }}</span>
           </div>
         </div>
         <div v-if="showExtensionPicker" class="extension-picker-wrap">
@@ -330,12 +348,40 @@ function resolveProjectName(projectId) {
   return project?.name || `项目 #${projectId}`
 }
 
+function taskStatusName(task) {
+  return task?.column_name || '未知状态'
+}
+
+function statusTagType(task) {
+  const status = taskStatusName(task)
+  if (status === '已完成') return 'success'
+  if (status === '进行中') return 'warning'
+  if (status === '待验收') return 'primary'
+  if (status === '待处理') return 'info'
+  return 'info'
+}
+
+function taskRowClassName({ row }) {
+  return taskStatusName(row) === '已完成' ? 'task-row-completed' : ''
+}
+
 function latestDeliveryDate(task) {
   const dates = task?.delivery_dates || []
   return dates[dates.length - 1] || task?.due_date || null
 }
 
+function isCompletionStatus(task) {
+  return ['待验收', '已完成'].includes(taskStatusName(task))
+}
+
+function taskTimeText(task) {
+  if (isCompletionStatus(task) && task?.completed_at) return `完成 ${formatDate(task.completed_at)}`
+  const deliveryDate = latestDeliveryDate(task)
+  return deliveryDate ? `交付 ${formatDate(deliveryDate)}` : '--'
+}
+
 function latestTaskTime(task) {
+  if (isCompletionStatus(task) && task?.completed_at) return task.completed_at
   return latestDeliveryDate(task) || task?.updated_at || task?.created_at || null
 }
 
@@ -366,6 +412,11 @@ function formatDate(value) {
 .task-kind-tag {
   margin-left: 8px;
   vertical-align: 1px;
+}
+
+.status-tag {
+  min-width: 64px;
+  justify-content: center;
 }
 
 .user-chip {
@@ -422,6 +473,23 @@ function formatDate(value) {
   color: #475569;
   font-size: 12px;
   line-height: 1.5;
+}
+
+:deep(.el-table__body tr.task-row-completed > td.el-table__cell) {
+  background: rgba(220, 252, 231, 0.52) !important;
+  color: #94a3b8;
+}
+
+:deep(.el-table__body tr.task-row-completed:hover > td.el-table__cell) {
+  background: rgba(187, 247, 208, 0.72) !important;
+}
+
+:deep(.el-table__body tr.task-row-completed .task-list-title),
+:deep(.el-table__body tr.task-row-completed .task-comment-author),
+:deep(.el-table__body tr.task-row-completed .task-comment-text),
+:deep(.el-table__body tr.task-row-completed .user-chip),
+:deep(.el-table__body tr.task-row-completed .user-presence-text) {
+  color: #94a3b8 !important;
 }
 
 .delivery-stack {

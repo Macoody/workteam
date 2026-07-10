@@ -4,6 +4,7 @@ import router from '@/router'
 
 let presenceTimer = null
 let presenceListenersReady = false
+let activeAuthStore = null
 
 function authHeader() {
   const token = localStorage.getItem('token')
@@ -18,6 +19,18 @@ function sendOfflineBeacon() {
     headers: authHeader(),
     keepalive: true
   }).catch(() => {})
+}
+
+function handlePageHide() {
+  sendOfflineBeacon()
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'hidden') {
+    sendOfflineBeacon()
+  } else if (document.visibilityState === 'visible') {
+    activeAuthStore?.heartbeatPresence()
+  }
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -60,6 +73,7 @@ export const useAuthStore = defineStore('auth', {
     },
     startPresence() {
       if (!this.token) return
+      activeAuthStore = this
       if (!presenceTimer) {
         this.heartbeatPresence()
         presenceTimer = window.setInterval(() => {
@@ -69,9 +83,12 @@ export const useAuthStore = defineStore('auth', {
       if (!presenceListenersReady) {
         presenceListenersReady = true
         window.addEventListener('beforeunload', sendOfflineBeacon)
+        window.addEventListener('pagehide', handlePageHide)
+        document.addEventListener('visibilitychange', handleVisibilityChange)
       }
     },
     async stopPresence() {
+      activeAuthStore = null
       if (presenceTimer) {
         window.clearInterval(presenceTimer)
         presenceTimer = null

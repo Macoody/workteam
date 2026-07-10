@@ -41,6 +41,7 @@ _LEGACY_COLUMN_DDL: dict[str, list[tuple[str, str]]] = {
         ("linked_document_id", "INTEGER"),
         ("delivery_dates", "TEXT"),
         ("completed_by", "TEXT"),
+        ("completed_at", "TIMESTAMP WITH TIME ZONE"),
         ("recurrence_rule_id", "INTEGER"),
         ("recurrence_occurrence_date", "DATE"),
     ],

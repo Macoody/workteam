@@ -43,7 +43,7 @@
                   {{ resolveUser(task.assignee_id).display_name || resolveUser(task.assignee_id).username }}
                   <span class="user-presence-text">{{ userPresenceText(resolveUser(task.assignee_id)) }}</span>
                 </span>
-                <span v-if="latestDeliveryDate(task)" class="pill">{{ formatDate(latestDeliveryDate(task)) }}</span>
+                <span v-if="taskTimeText(task)" class="pill">{{ taskTimeText(task) }}</span>
                 <span v-if="task.recurrence_rule_id" class="pill">周期</span>
               </div>
               <div v-if="task.description" class="task-card-note">{{ task.description }}</div>
@@ -93,6 +93,13 @@
           <div class="delivery-item" v-for="(item, index) in deliveryTimeline" :key="`${item}-${index}`">
             <span class="delivery-index">{{ index === 0 ? '原始' : `延期 ${index}` }}</span>
             <span>{{ formatDate(item) }}</span>
+          </div>
+        </div>
+        <div v-if="currentTask?.completed_at" class="delivery-stack">
+          <div class="section-label">完成时间</div>
+          <div class="delivery-item">
+            <span class="delivery-index">实际完成</span>
+            <span>{{ formatDate(currentTask.completed_at) }}</span>
           </div>
         </div>
         <div v-if="showExtensionPicker" class="extension-picker-wrap">
@@ -539,6 +546,17 @@ function getPendingColumnId() {
 function latestDeliveryDate(task) {
   const dates = task?.delivery_dates || []
   return dates[dates.length - 1] || task?.due_date || null
+}
+
+function isCompletionStatus(task) {
+  const status = task?.column_name || resolveTaskStatus(task)
+  return ['待验收', '已完成'].includes(status)
+}
+
+function taskTimeText(task) {
+  if (isCompletionStatus(task) && task?.completed_at) return `完成 ${formatDate(task.completed_at)}`
+  const deliveryDate = latestDeliveryDate(task)
+  return deliveryDate ? `交付 ${formatDate(deliveryDate)}` : ''
 }
 
 function formatDate(value) {

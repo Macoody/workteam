@@ -151,6 +151,7 @@ class Task(Base):
     due_date = Column(DateTime(timezone=True))
     delivery_dates = Column(Text)
     completed_by = Column(Text)
+    completed_at = Column(DateTime(timezone=True))
     tags = Column(Text)
     recurrence_rule_id = Column(Integer, ForeignKey("recurring_task_rules.id"))
     recurrence_occurrence_date = Column(Date)

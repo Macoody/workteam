@@ -15,7 +15,9 @@
                 <span class="member-online-dot" :class="{ online: isUserOnline(row) }"></span>
               </span>
               <div>
-                <div class="item-title">{{ row.display_name || row.username }}</div>
+                <button type="button" class="member-name-button" @click.stop="openMemberTasks(row)">
+                  {{ memberName(row) }}
+                </button>
                 <div class="item-meta">@{{ row.username }}</div>
               </div>
             </div>
@@ -76,6 +78,49 @@
         </el-table-column>
       </el-table>
     </div>
+
+    <el-drawer
+      v-model="memberTasksDrawer"
+      :title="selectedMember ? `${memberName(selectedMember)} 的任务` : '成员任务'"
+      size="min(680px, 92vw)"
+      append-to-body
+    >
+      <div class="drawer-toolbar">
+        <div>
+          <div class="drawer-summary-title">{{ selectedMember ? `@${selectedMember.username}` : '' }}</div>
+          <div class="drawer-summary-meta">{{ memberTasks.length }} 个任务</div>
+        </div>
+        <el-button size="small" :loading="memberTasksLoading" @click="loadMemberTasks()">刷新</el-button>
+      </div>
+
+      <div class="member-task-list-wrap" v-loading="memberTasksLoading">
+        <el-empty v-if="!memberTasksLoading && !memberTasks.length" description="这个成员暂时没有归属任务" />
+        <div v-else class="member-task-list">
+          <div
+            v-for="task in memberTasks"
+            :key="task.id"
+            class="member-task-item"
+            :class="{ completed: taskStatusName(task) === '已完成' }"
+            :style="{ borderColor: task.column_color || '#e5e7eb' }"
+          >
+            <div class="member-task-header">
+              <div class="member-task-title">
+                {{ task.title }}
+                <el-tag v-if="task.recurrence_rule_id" size="small" effect="light" class="task-kind-tag">周期</el-tag>
+              </div>
+              <el-tag :type="statusTagType(task)" effect="light" class="status-tag">
+                {{ taskStatusName(task) }}
+              </el-tag>
+            </div>
+            <div class="member-task-meta">
+              <span>{{ resolveProjectName(task.project_id) }}</span>
+              <span>{{ taskTimeText(task) }}</span>
+            </div>
+            <div v-if="task.node_output" class="member-task-output">{{ task.node_output }}</div>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
 
     <el-dialog v-model="showDialog" :title="editingUserId ? '编辑成员' : '添加成员'" width="520px">
       <el-form :model="form" label-position="top" @submit.prevent="handleSubmit">
@@ -142,6 +187,11 @@ const saving = ref(false)
 const showDialog = ref(false)
 const editingUserId = ref(null)
 const members = ref([])
+const projects = ref([])
+const memberTasksDrawer = ref(false)
+const selectedMember = ref(null)
+const memberTasks = ref([])
+const memberTasksLoading = ref(false)
 let membersRefreshTimer = null
 const form = reactive({
   username: '',
@@ -154,7 +204,10 @@ const form = reactive({
 
 onMounted(async () => {
   await auth.getMe()
-  await loadMembers()
+  await Promise.all([
+    loadMembers(),
+    loadProjects()
+  ])
   membersRefreshTimer = window.setInterval(() => {
     loadMembers(true)
   }, 30000)
@@ -176,6 +229,38 @@ async function loadMembers(silent = false) {
     if (!silent) ElMessage.error('成员列表加载失败')
   } finally {
     if (!silent) loading.value = false
+  }
+}
+
+async function loadProjects() {
+  try {
+    projects.value = await api.get('/projects')
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+async function openMemberTasks(user) {
+  selectedMember.value = user
+  memberTasks.value = []
+  memberTasksDrawer.value = true
+  await loadMemberTasks(user)
+}
+
+async function loadMemberTasks(user = selectedMember.value) {
+  if (!user?.id) return
+  const targetUserId = user.id
+  memberTasksLoading.value = true
+  try {
+    const tasks = await api.get(`/tasks?assignee_id=${encodeURIComponent(targetUserId)}`)
+    if (selectedMember.value?.id === targetUserId) {
+      memberTasks.value = sortTasksByLatest(tasks)
+    }
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('成员任务加载失败')
+  } finally {
+    memberTasksLoading.value = false
   }
 }
 
@@ -230,7 +315,7 @@ async function handleSubmit() {
 
 async function confirmDelete(user) {
   try {
-    await ElMessageBox.confirm(`确定删除成员“${user.display_name || user.username}”吗？`, '删除成员', {
+    await ElMessageBox.confirm(`确定删除成员“${memberName(user)}”吗？`, '删除成员', {
       type: 'warning',
       confirmButtonText: '删除',
       cancelButtonText: '取消'
@@ -260,8 +345,62 @@ function roleLabel(role) {
   return '成员'
 }
 
+function memberName(user) {
+  return user?.display_name || user?.username || '成员'
+}
+
+function resolveProjectName(projectId) {
+  const project = projects.value.find(item => item.id === projectId)
+  return project?.name || `项目 #${projectId}`
+}
+
+function taskStatusName(task) {
+  return task?.column_name || '未知状态'
+}
+
+function statusTagType(task) {
+  const status = taskStatusName(task)
+  if (status === '已完成') return 'success'
+  if (status === '进行中') return 'warning'
+  if (status === '待验收') return 'primary'
+  if (status === '待处理') return 'info'
+  return 'info'
+}
+
+function latestDeliveryDate(task) {
+  const dates = task?.delivery_dates || []
+  return dates[dates.length - 1] || task?.due_date || null
+}
+
+function isCompletionStatus(task) {
+  return ['待验收', '已完成'].includes(taskStatusName(task))
+}
+
+function taskTimeText(task) {
+  if (isCompletionStatus(task) && task?.completed_at) return `完成 ${formatTaskDate(task.completed_at)}`
+  const deliveryDate = latestDeliveryDate(task)
+  return deliveryDate ? `交付 ${formatTaskDate(deliveryDate)}` : '--'
+}
+
+function latestTaskTime(task) {
+  if (isCompletionStatus(task) && task?.completed_at) return task.completed_at
+  return latestDeliveryDate(task) || task?.updated_at || task?.created_at || null
+}
+
+function sortTasksByLatest(list) {
+  return [...(list || [])].sort((left, right) => {
+    const rightTime = dayjs(latestTaskTime(right)).valueOf() || 0
+    const leftTime = dayjs(latestTaskTime(left)).valueOf() || 0
+    return rightTime - leftTime || (right?.id || 0) - (left?.id || 0)
+  })
+}
+
 function formatDate(value) {
   return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '--'
+}
+
+function formatTaskDate(value) {
+  return value ? dayjs(value).format('MM-DD HH:mm') : '--'
 }
 </script>
 
@@ -270,6 +409,25 @@ function formatDate(value) {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.member-name-button {
+  appearance: none;
+  display: inline-flex;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+
+.member-name-button:hover {
+  color: #2563eb;
 }
 
 .member-color-dot {
@@ -343,6 +501,92 @@ function formatDate(value) {
   font-size: 12px;
 }
 
+.drawer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.drawer-summary-title {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.drawer-summary-meta {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.member-task-list-wrap {
+  min-height: 220px;
+}
+
+.member-task-list {
+  display: grid;
+  gap: 12px;
+}
+
+.member-task-item {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.member-task-item.completed {
+  background: #f8fafc;
+}
+
+.member-task-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.member-task-title {
+  min-width: 0;
+  color: #0f172a;
+  font-weight: 700;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.task-kind-tag {
+  margin-left: 8px;
+  vertical-align: 1px;
+}
+
+.status-tag {
+  flex: 0 0 auto;
+  min-width: 64px;
+  justify-content: center;
+}
+
+.member-task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.member-task-output {
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 640px) {
   .member-presence {
     align-items: flex-start;
@@ -357,6 +601,16 @@ function formatDate(value) {
 
   .color-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .drawer-toolbar,
+  .member-task-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .status-tag {
+    width: fit-content;
   }
 }
 </style>

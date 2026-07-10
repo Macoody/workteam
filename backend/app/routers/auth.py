@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -20,6 +21,11 @@ router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 ONLINE_TIMEOUT_SECONDS = 90
+BUSINESS_TZ = ZoneInfo(settings.BUSINESS_TIMEZONE)
+
+
+def business_now():
+    return datetime.now(BUSINESS_TZ).replace(tzinfo=None)
 
 
 def _naive(value: datetime | None):
@@ -29,7 +35,7 @@ def _naive(value: datetime | None):
 
 
 def _mark_online(db: Session, user: User, commit: bool = True):
-    now = datetime.now()
+    now = business_now()
     user.is_online = True
     user.last_visit_time = now
     user.last_active_time = now
@@ -40,7 +46,7 @@ def _mark_online(db: Session, user: User, commit: bool = True):
 
 
 def _mark_offline(db: Session, user: User, commit: bool = True):
-    now = datetime.now()
+    now = business_now()
     user.is_online = False
     user.last_offline_time = now
     if commit:
@@ -50,7 +56,7 @@ def _mark_offline(db: Session, user: User, commit: bool = True):
 
 
 def _normalize_presence(user: User, now: datetime | None = None) -> bool:
-    now = now or datetime.now()
+    now = now or business_now()
     if not user.is_online:
         return False
     last_active = _naive(user.last_active_time)
@@ -160,7 +166,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None or not user.is_active:
         raise credentials_exception
     # 更新访问和在线状态（最多每 60 秒写一次，避免普通接口频繁写库）
-    now = datetime.now()
+    now = business_now()
     last_visit_time = _naive(user.last_visit_time)
     if not user.is_online or user.last_visit_time is None or (now - last_visit_time).total_seconds() > 60:
         user.is_online = True
@@ -264,7 +270,7 @@ def presence_offline(db: Session = Depends(get_db), current_user: User = Depends
 @router.get("/users", response_model=list[UserResponse])
 def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     users = db.query(User).filter(User.is_active.is_(True)).order_by(User.created_at.desc()).all()
-    now = datetime.now()
+    now = business_now()
     changed = any(_normalize_presence(user, now) for user in users)
     if changed:
         db.commit()
