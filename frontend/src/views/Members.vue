@@ -7,20 +7,34 @@
 
     <div class="panel table-panel">
       <el-table :data="members" style="width: 100%" v-loading="loading">
-        <el-table-column prop="display_name" label="成员" min-width="200">
+        <el-table-column prop="display_name" label="成员" width="150">
           <template #default="{ row }">
             <div class="member-identity">
               <span class="member-avatar-wrap">
                 <span class="member-color-dot" :style="{ background: row.color || '#93c5fd' }"></span>
                 <span class="member-online-dot" :class="{ online: isUserOnline(row) }"></span>
               </span>
-              <div>
-                <button type="button" class="member-name-button" @click.stop="openMemberTasks(row)">
-                  {{ memberName(row) }}
+              <div class="member-identity-body">
+                <button type="button" class="member-name-button" :title="memberName(row)" @click.stop="openMemberTasks(row)">
+                  {{ shortMemberName(row) }}
                 </button>
-                <div class="item-meta">@{{ row.username }}</div>
+                <div class="item-meta member-username" :title="`@${row.username}`">@{{ row.username }}</div>
               </div>
             </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="当前板块" width="130">
+          <template #default="{ row }">
+            <span class="section-pill current" :title="row.current_section || '暂无记录'">
+              {{ row.current_section || '--' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="上个板块" width="130">
+          <template #default="{ row }">
+            <span class="section-pill previous" :title="row.previous_section || '暂无记录'">
+              {{ row.previous_section || '--' }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column label="标记色" width="120">
@@ -349,6 +363,11 @@ function memberName(user) {
   return user?.display_name || user?.username || '成员'
 }
 
+function shortMemberName(user) {
+  const name = memberName(user)
+  return name.length > 8 ? `${name.slice(0, 8)}…` : name
+}
+
 function resolveProjectName(projectId) {
   const project = projects.value.find(item => item.id === projectId)
   return project?.name || `项目 #${projectId}`
@@ -414,7 +433,7 @@ function formatTaskDate(value) {
 .member-name-button {
   appearance: none;
   display: inline-flex;
-  max-width: 100%;
+  max-width: 96px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -423,7 +442,10 @@ function formatTaskDate(value) {
   font-weight: 700;
   line-height: 1.4;
   text-align: left;
+  overflow: hidden;
   cursor: pointer;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .member-name-button:hover {
@@ -440,6 +462,17 @@ function formatTaskDate(value) {
 .member-avatar-wrap {
   position: relative;
   display: inline-flex;
+}
+
+.member-identity-body {
+  min-width: 0;
+}
+
+.member-username {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .member-online-dot {
@@ -467,6 +500,30 @@ function formatTaskDate(value) {
 .presence-online-text {
   color: #15803d;
   font-weight: 700;
+}
+
+.section-pill {
+  display: inline-flex;
+  max-width: 108px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.section-pill.current {
+  background: #ecfeff;
+  color: #0f766e;
+}
+
+.section-pill.previous {
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 .member-color-pill {

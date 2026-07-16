@@ -49,6 +49,8 @@ _LEGACY_COLUMN_DDL: dict[str, list[tuple[str, str]]] = {
         ("last_visit_time", "TIMESTAMP WITH TIME ZONE"),
         ("last_active_time", "TIMESTAMP WITH TIME ZONE"),
         ("last_offline_time", "TIMESTAMP WITH TIME ZONE"),
+        ("current_section", "VARCHAR(100)"),
+        ("previous_section", "VARCHAR(100)"),
         ("wechat_openid", "VARCHAR(100)"),
         ("wechat_unionid", "VARCHAR(100)"),
         ("wechat_bound_at", "TIMESTAMP WITH TIME ZONE"),

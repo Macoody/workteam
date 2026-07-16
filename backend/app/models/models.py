@@ -58,6 +58,8 @@ class User(Base):
     last_visit_time = Column(DateTime(timezone=True), nullable=True)
     last_active_time = Column(DateTime(timezone=True), nullable=True)
     last_offline_time = Column(DateTime(timezone=True), nullable=True)
+    current_section = Column(String(100), nullable=True)
+    previous_section = Column(String(100), nullable=True)
     wechat_openid = Column(String(100), unique=True, index=True)
     wechat_unionid = Column(String(100), index=True)
     wechat_bound_at = Column(DateTime(timezone=True), nullable=True)

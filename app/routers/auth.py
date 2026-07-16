@@ -15,7 +15,14 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.timezone import business_now, to_business_time
 from app.models.models import User, normalize_role, ROLE_ADMIN
-from app.schemas.schemas import UserCreate, UserManageCreate, UserManageUpdate, UserResponse, TokenResponse
+from app.schemas.schemas import (
+    PresenceHeartbeatRequest,
+    UserCreate,
+    UserManageCreate,
+    UserManageUpdate,
+    UserResponse,
+    TokenResponse,
+)
 
 router = APIRouter()
 
@@ -27,11 +34,20 @@ def _naive(value: datetime | None):
     return to_business_time(value)
 
 
-def _mark_online(db: Session, user: User, commit: bool = True):
+def _clean_section(value: str | None):
+    value = (value or "").strip()
+    return value[:100] or None
+
+
+def _mark_online(db: Session, user: User, commit: bool = True, current_section: str | None = None):
     now = business_now()
+    section = _clean_section(current_section)
     user.is_online = True
     user.last_visit_time = now
     user.last_active_time = now
+    if section and section != user.current_section:
+        user.previous_section = user.current_section
+        user.current_section = section
     if commit:
         db.commit()
         db.refresh(user)
@@ -261,8 +277,12 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/presence/heartbeat", response_model=UserResponse)
-def presence_heartbeat(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return build_user_response(_mark_online(db, current_user))
+def presence_heartbeat(
+    data: PresenceHeartbeatRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return build_user_response(_mark_online(db, current_user, current_section=data.current_section if data else None))
 
 
 @router.post("/presence/offline")

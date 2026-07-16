@@ -31,6 +31,10 @@ class UserManageUpdate(BaseModel):
     color: Optional[str] = None
 
 
+class PresenceHeartbeatRequest(BaseModel):
+    current_section: Optional[str] = None
+
+
 class UserLogin(BaseModel):
     username: str
     password: str
@@ -50,6 +54,8 @@ class UserResponse(BaseModel):
     last_visit_time: Optional[datetime]
     last_active_time: Optional[datetime]
     last_offline_time: Optional[datetime]
+    current_section: Optional[str] = None
+    previous_section: Optional[str] = None
 
     class Config:
         from_attributes = True

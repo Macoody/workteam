@@ -6,6 +6,25 @@ let presenceTimer = null
 let presenceListenersReady = false
 let activeAuthStore = null
 
+const sectionLabelMap = {
+  Dashboard: '总览',
+  Projects: '项目',
+  Members: '成员管理',
+  Kanban: '项目看板',
+  Tasks: '任务',
+  DigitalEmployees: '数字员工',
+  Documents: '文档中心',
+  DocEditor: '文档编辑',
+  WorkLogs: '工作日志',
+  Versions: '版本更新',
+  Login: '登录'
+}
+
+function currentSectionLabel() {
+  const route = router.currentRoute.value
+  return route?.meta?.title || sectionLabelMap[route?.name] || route?.name || '未知板块'
+}
+
 function authHeader() {
   const token = localStorage.getItem('token')
   return token ? { Authorization: `Bearer ${token}` } : {}
@@ -64,7 +83,9 @@ export const useAuthStore = defineStore('auth', {
     async heartbeatPresence() {
       if (!this.token) return null
       try {
-        this.user = await api.post('/auth/presence/heartbeat')
+        this.user = await api.post('/auth/presence/heartbeat', {
+          current_section: currentSectionLabel()
+        })
         return this.user
       } catch (error) {
         console.error(error)

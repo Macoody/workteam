@@ -54,7 +54,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { Odometer, FolderOpened, List, Document, Calendar, User, CollectionTag, Cellphone } from '@element-plus/icons-vue'
 import logoXudong from '@/assets/logo-xudong.svg'
@@ -90,10 +91,18 @@ const roleMap = {
 }
 
 const auth = useAuthStore()
+const route = useRoute()
 const roleLabel = computed(() => roleMap[auth.user?.role] || '团队成员')
 
 onMounted(() => {
   auth.startPresence()
 })
+
+watch(
+  () => route.fullPath,
+  () => {
+    auth.heartbeatPresence()
+  }
+)
 
 </script>
