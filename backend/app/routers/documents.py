@@ -2,7 +2,7 @@
 文档中心路由
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
-from sqlalchemy import text
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 import os
@@ -170,6 +170,7 @@ def list_documents(
     folder_id: int = None,
     project_id: int = None,
     my_docs: bool = False,
+    q: str | None = Query(None, max_length=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -180,6 +181,15 @@ def list_documents(
         query = query.filter(Document.project_id == project_id)
     if my_docs:
         query = query.filter(Document.creator_id == current_user.id)
+    keyword = q.strip() if q else ""
+    if keyword:
+        pattern = f"%{keyword}%"
+        query = query.filter(
+            or_(
+                Document.title.ilike(pattern),
+                func.coalesce(Document.content, "").ilike(pattern),
+            )
+        )
     docs = query.order_by(
         Document.last_edited_at.desc(),
         Document.updated_at.desc(),

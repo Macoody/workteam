@@ -56,7 +56,7 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { Odometer, FolderOpened, List, Document, Calendar, User, CollectionTag } from '@element-plus/icons-vue'
+import { Odometer, FolderOpened, List, Document, Calendar, User, CollectionTag, Cellphone } from '@element-plus/icons-vue'
 import logoXudong from '@/assets/logo-xudong.svg'
 import { currentVersion } from '@/data/versionHistory'
 import { isUserOnline, userPresenceText } from '@/utils/presence'
@@ -77,6 +77,7 @@ const navItems = [
   { to: '/projects', label: '项目', icon: FolderOpened },
   { to: '/members', label: '成员', icon: User },
   { to: '/tasks', label: '任务', icon: List },
+  { to: '/digital-employees', label: '数字员工', icon: Cellphone },
   { to: '/documents', label: '文档', icon: Document },
   { to: '/logs', label: '工作日志', icon: Calendar },
   { to: '/versions', label: '版本更新', icon: CollectionTag }

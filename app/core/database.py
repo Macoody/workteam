@@ -66,6 +66,12 @@ _LEGACY_COLUMN_DDL: dict[str, list[tuple[str, str]]] = {
         ("last_editor_id", "INTEGER"),
         ("last_edited_at", "TIMESTAMP WITH TIME ZONE"),
     ],
+    "digital_phones": [
+        ("activation_code", "VARCHAR(100)"),
+    ],
+    "digital_customers": [
+        ("device_number", "VARCHAR(100)"),
+    ],
 }
 
 

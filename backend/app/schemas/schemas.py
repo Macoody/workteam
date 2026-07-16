@@ -381,3 +381,187 @@ class WorkLogResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# === 数字员工 ===
+class DigitalCustomerSummary(BaseModel):
+    id: int
+    name: str
+    phone: Optional[str] = None
+    device_number: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DigitalPhoneSummary(BaseModel):
+    id: int
+    model: str
+    memory: str
+    serial_number: Optional[str] = None
+    activation_code: Optional[str] = None
+    status: str
+    bound_phone: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DigitalPhoneBase(BaseModel):
+    model: str
+    memory: str
+    serial_number: Optional[str] = None
+    activation_code: Optional[str] = None
+    condition: str = "new"
+    color: Optional[str] = None
+    status: str = "in_stock"
+    holder_id: Optional[int] = None
+    customer_id: Optional[int] = None
+    bound_phone: Optional[str] = None
+    douyin_account: Optional[str] = None
+    xiaohongshu_account: Optional[str] = None
+    wechat_account: Optional[str] = None
+    kuaishou_account: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class DigitalPhoneCreate(DigitalPhoneBase):
+    pass
+
+
+class DigitalPhoneUpdate(BaseModel):
+    model: Optional[str] = None
+    memory: Optional[str] = None
+    serial_number: Optional[str] = None
+    activation_code: Optional[str] = None
+    condition: Optional[str] = None
+    color: Optional[str] = None
+    status: Optional[str] = None
+    holder_id: Optional[int] = None
+    customer_id: Optional[int] = None
+    bound_phone: Optional[str] = None
+    douyin_account: Optional[str] = None
+    xiaohongshu_account: Optional[str] = None
+    wechat_account: Optional[str] = None
+    kuaishou_account: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class DigitalPhoneResponse(DigitalPhoneBase):
+    id: int
+    holder: Optional[UserResponse] = None
+    customer: Optional[DigitalCustomerSummary] = None
+    creator: Optional[UserResponse] = None
+    created_by: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DigitalCustomerBase(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    wechat: Optional[str] = None
+    device_number: Optional[str] = None
+    source: Optional[str] = None
+    payment_amount: Optional[str] = None
+    payment_method: Optional[str] = None
+    payment_status: str = "unpaid"
+    payment_note: Optional[str] = None
+    service_start_at: Optional[datetime] = None
+    service_end_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+class DigitalCustomerCreate(DigitalCustomerBase):
+    phone_ids: Optional[List[int]] = []
+
+
+class DigitalCustomerUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    wechat: Optional[str] = None
+    device_number: Optional[str] = None
+    source: Optional[str] = None
+    payment_amount: Optional[str] = None
+    payment_method: Optional[str] = None
+    payment_status: Optional[str] = None
+    payment_note: Optional[str] = None
+    service_start_at: Optional[datetime] = None
+    service_end_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    phone_ids: Optional[List[int]] = None
+
+
+class DigitalServiceItemCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    is_active: bool = True
+    sort_order: Optional[int] = None
+
+
+class DigitalServiceItemUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+class DigitalServiceItemResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    is_active: bool
+    sort_order: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DigitalServiceRecordUpdate(BaseModel):
+    is_done: bool = False
+    notes: Optional[str] = None
+
+
+class DigitalServiceRecordResponse(BaseModel):
+    id: int
+    customer_id: int
+    service_item_id: int
+    service_item: Optional[DigitalServiceItemResponse] = None
+    is_done: bool
+    completed_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    updated_by: Optional[int] = None
+    updated_user: Optional[UserResponse] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DigitalCustomerResponse(DigitalCustomerBase):
+    id: int
+    phones: List[DigitalPhoneSummary] = []
+    service_records: List[DigitalServiceRecordResponse] = []
+    creator: Optional[UserResponse] = None
+    created_by: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DigitalOverviewResponse(BaseModel):
+    total_phones: int = 0
+    in_stock_phones: int = 0
+    assigned_phones: int = 0
+    sold_phones: int = 0
+    customers: int = 0
+    active_service_items: int = 0
+    unfinished_service_records: int = 0

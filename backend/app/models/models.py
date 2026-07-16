@@ -16,6 +16,7 @@ from sqlalchemy import (
     Date,
     ForeignKey,
     Boolean,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -304,3 +305,107 @@ class WorkLog(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=business_now)
 
     user = relationship("User")
+
+
+class DigitalCustomer(Base):
+    __tablename__ = "digital_customers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, index=True)
+    phone = Column(String(30))
+    wechat = Column(String(100))
+    device_number = Column(String(100))
+    source = Column(String(100))
+    payment_amount = Column(String(100))
+    payment_method = Column(String(100))
+    payment_status = Column(String(50), default="unpaid")
+    payment_note = Column(Text)
+    service_start_at = Column(DateTime(timezone=True))
+    service_end_at = Column(DateTime(timezone=True))
+    notes = Column(Text)
+    created_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), default=business_now, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=business_now)
+
+    creator = relationship("User", foreign_keys=[created_by])
+    phones = relationship("DigitalPhone", back_populates="customer")
+    service_records = relationship(
+        "DigitalServiceRecord",
+        back_populates="customer",
+        cascade="all, delete-orphan",
+    )
+
+
+class DigitalPhone(Base):
+    __tablename__ = "digital_phones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    model = Column(String(100), nullable=False)
+    memory = Column(String(50), nullable=False)
+    serial_number = Column(String(100), unique=True, index=True)
+    activation_code = Column(String(100))
+    condition = Column("phone_condition", String(20), default="new")
+    color = Column(String(50))
+    status = Column(String(30), default="in_stock", index=True)
+    holder_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    customer_id = Column(Integer, ForeignKey("digital_customers.id", ondelete="SET NULL"))
+    bound_phone = Column(String(30))
+    douyin_account = Column(String(100))
+    xiaohongshu_account = Column(String(100))
+    wechat_account = Column(String(100))
+    kuaishou_account = Column(String(100))
+    notes = Column(Text)
+    created_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), default=business_now, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=business_now)
+
+    holder = relationship("User", foreign_keys=[holder_id])
+    creator = relationship("User", foreign_keys=[created_by])
+    customer = relationship("DigitalCustomer", back_populates="phones")
+
+
+class DigitalServiceItem(Base):
+    __tablename__ = "digital_service_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True)
+    description = Column(Text)
+    is_active = Column(Boolean, default=True)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), default=business_now, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=business_now)
+
+
+class DigitalServiceRecord(Base):
+    __tablename__ = "digital_service_records"
+    __table_args__ = (
+        UniqueConstraint(
+            "customer_id",
+            "service_item_id",
+            name="ux_digital_service_record_customer_item",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(
+        Integer,
+        ForeignKey("digital_customers.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    service_item_id = Column(
+        Integer,
+        ForeignKey("digital_service_items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    is_done = Column(Boolean, default=False)
+    completed_at = Column(DateTime(timezone=True))
+    notes = Column(Text)
+    updated_by = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), default=business_now, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=business_now)
+
+    customer = relationship("DigitalCustomer", back_populates="service_records")
+    service_item = relationship("DigitalServiceItem")
+    updated_user = relationship("User")

@@ -14,6 +14,7 @@ const routes = [
   { path: '/members', name: 'Members', component: () => import('@/views/Members.vue'), meta: { requiresAuth: true } },
   { path: '/kanban/:projectId?', name: 'Kanban', component: () => import('@/views/Kanban.vue'), meta: { requiresAuth: true } },
   { path: '/tasks', name: 'Tasks', component: () => import('@/views/Tasks.vue'), meta: { requiresAuth: true } },
+  { path: '/digital-employees', name: 'DigitalEmployees', component: () => import('@/views/DigitalEmployees.vue'), meta: { requiresAuth: true, title: '数字员工' } },
   { path: '/documents', name: 'Documents', component: () => import('@/views/Documents.vue'), meta: { requiresAuth: true } },
   { path: '/documents/:id', name: 'DocEditor', component: () => import('@/views/DocEditor.vue'), meta: { requiresAuth: true } },
   { path: '/logs', name: 'WorkLogs', component: () => import('@/views/WorkLogs.vue'), meta: { requiresAuth: true, title: '工作日志' } },

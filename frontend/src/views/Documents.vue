@@ -1,11 +1,26 @@
 <template>
   <AppShell title="文档中心" description="把过程资料和输出文档集中沉淀，方便项目协作和后续复用。">
     <template #actions>
+      <el-input
+        v-model="searchKeyword"
+        class="doc-search-input"
+        clearable
+        placeholder="搜索标题或内容"
+        @keyup.enter="loadDocs"
+        @clear="loadDocs"
+      >
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+      </el-input>
+      <el-button @click="loadDocs">搜索</el-button>
       <el-button type="primary" @click="showCreate = true">新建文档</el-button>
       <el-button @click="loadDocs">刷新</el-button>
     </template>
 
-    <div v-if="docs.length === 0" class="empty-card">还没有文档，先创建一篇项目记录或说明文档。</div>
+    <div v-if="docs.length === 0" class="empty-card">
+      {{ searchKeyword.trim() ? '没有找到匹配的文档。' : '还没有文档，先创建一篇项目记录或说明文档。' }}
+    </div>
     <div v-else class="doc-grid">
       <div v-for="doc in docs" :key="doc.id" class="doc-card" @click="$router.push(`/documents/${doc.id}`)">
         <div style="display: flex; justify-content: space-between; gap: 12px; align-items: flex-start">
@@ -79,12 +94,14 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
 import AppShell from '@/components/AppShell.vue'
 import api from '@/api'
 import { formatBusinessTime } from '@/utils/time'
 
 const auth = useAuthStore()
 const docs = ref([])
+const searchKeyword = ref('')
 const showCreate = ref(false)
 const loading = ref(false)
 const form = reactive({ title: '', doc_type: 'doc', content: '' })
@@ -104,7 +121,11 @@ onMounted(async () => {
 })
 
 async function loadDocs() {
-  docs.value = await api.get('/documents')
+  const keyword = searchKeyword.value.trim()
+  const params = new URLSearchParams()
+  if (keyword) params.set('q', keyword)
+  const query = params.toString()
+  docs.value = await api.get(`/documents${query ? `?${query}` : ''}`)
 }
 
 async function handleCreate() {
@@ -207,5 +228,15 @@ function formatDate(value) {
 
 .doc-card-actions :deep(.el-button + .el-button) {
   margin-left: 0;
+}
+
+.doc-search-input {
+  width: 260px;
+}
+
+@media (max-width: 640px) {
+  .doc-search-input {
+    width: 100%;
+  }
 }
 </style>

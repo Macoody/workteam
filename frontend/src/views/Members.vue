@@ -48,11 +48,6 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180">
-          <template #default="{ row }">
-            {{ formatDate(row.created_at) }}
-          </template>
-        </el-table-column>
         <el-table-column label="最后活跃时间" width="180">
           <template #default="{ row }">
             <span :class="row.last_active_time ? '' : 'text-muted'">
@@ -60,7 +55,7 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="170" fixed="right">
+        <el-table-column label="操作" width="170">
           <template #default="{ row }">
             <div style="display: flex; gap: 8px">
               <el-button size="small" @click="openEdit(row)">编辑</el-button>
@@ -74,6 +69,11 @@
                 删除
               </el-button>
             </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="创建时间" width="180">
+          <template #default="{ row }">
+            <span class="created-time">{{ formatDate(row.created_at) }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -498,6 +498,11 @@ function formatTaskDate(value) {
 
 .text-muted {
   color: #999;
+  font-size: 12px;
+}
+
+.created-time {
+  color: #a8a8a8;
   font-size: 12px;
 }
 

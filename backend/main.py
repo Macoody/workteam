@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.database import engine, Base, SessionLocal, ensure_runtime_schema
-from app.routers import auth, projects, tasks, documents, kanban, worklogs, wechat
+from app.routers import auth, projects, tasks, documents, kanban, worklogs, wechat, digital_employees
 from app.services.recurring_tasks import generate_due_recurring_tasks
 
 # 创建数据库表
@@ -83,6 +83,7 @@ app.include_router(tasks.router, prefix="/api/tasks", tags=["任务"])
 app.include_router(documents.router, prefix="/api/documents", tags=["文档中心"])
 app.include_router(worklogs.router, prefix="/api/worklogs", tags=["工作日志"])
 app.include_router(wechat.router, prefix="/api/wechat", tags=["微信小程序"])
+app.include_router(digital_employees.router, prefix="/api/digital-employees", tags=["数字员工"])
 
 
 @app.get("/health")
